@@ -22,7 +22,7 @@ async def get_current_user(
     try:
         claims = verify_jwt(
             credentials.credentials,
-            settings.supabase_jwt_secret.get_secret_value(),
+            settings.supabase_jwks_url,
         )
     except AuthError as err:
         raise HTTPException(

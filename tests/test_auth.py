@@ -1,6 +1,8 @@
 from datetime import timedelta
+from unittest.mock import MagicMock, patch
 
 import pytest
+from cryptography.hazmat.primitives.asymmetric import ec
 from fastapi.testclient import TestClient
 
 from src.auth.jwt import AuthError, verify_jwt
@@ -11,8 +13,8 @@ from tests.conftest import make_token
 # ---------------------------------------------------------------------------
 
 
-def test_valid_token(client: TestClient, jwt_secret: str) -> None:
-    token = make_token(jwt_secret, sub="user-abc")
+def test_valid_token(client: TestClient, ec_private_key: ec.EllipticCurvePrivateKey) -> None:
+    token = make_token(ec_private_key, sub="user-abc")
     response = client.get(
         "/test-protected",
         headers={"Authorization": f"Bearer {token}"},
@@ -21,8 +23,8 @@ def test_valid_token(client: TestClient, jwt_secret: str) -> None:
     assert response.json()["user_id"] == "user-abc"
 
 
-def test_expired_token(client: TestClient, jwt_secret: str) -> None:
-    token = make_token(jwt_secret, exp_delta=timedelta(seconds=-1))
+def test_expired_token(client: TestClient, ec_private_key: ec.EllipticCurvePrivateKey) -> None:
+    token = make_token(ec_private_key, exp_delta=timedelta(seconds=-1))
     response = client.get(
         "/test-protected",
         headers={"Authorization": f"Bearer {token}"},
@@ -54,25 +56,39 @@ def test_health_still_public(client: TestClient) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_verify_jwt_valid(jwt_secret: str) -> None:
-    token = make_token(jwt_secret, sub="u-999")
-    claims = verify_jwt(token, jwt_secret)
+def test_verify_jwt_valid(
+    ec_private_key: ec.EllipticCurvePrivateKey,
+    ec_public_key: ec.EllipticCurvePublicKey,
+) -> None:
+    token = make_token(ec_private_key, sub="u-999")
+    claims = verify_jwt(token, "https://fake.test/jwks.json")
     assert claims["sub"] == "u-999"
 
 
-def test_verify_jwt_expired(jwt_secret: str) -> None:
-    token = make_token(jwt_secret, exp_delta=timedelta(seconds=-1))
+def test_verify_jwt_expired(ec_private_key: ec.EllipticCurvePrivateKey) -> None:
+    token = make_token(ec_private_key, exp_delta=timedelta(seconds=-1))
     with pytest.raises(AuthError) as exc_info:
-        verify_jwt(token, jwt_secret)
+        verify_jwt(token, "https://fake.test/jwks.json")
     assert exc_info.value.reason == "expired"
 
 
-def test_verify_jwt_malformed(jwt_secret: str) -> None:
+def test_verify_jwt_malformed() -> None:
     with pytest.raises(AuthError):
-        verify_jwt("not.a.jwt", jwt_secret)
+        verify_jwt("not.a.jwt", "https://fake.test/jwks.json")
 
 
-def test_verify_jwt_wrong_secret(jwt_secret: str) -> None:
-    token = make_token(jwt_secret)
-    with pytest.raises(AuthError):
-        verify_jwt(token, "wrong-secret")
+def test_verify_jwt_wrong_key(ec_private_key: ec.EllipticCurvePrivateKey) -> None:
+    token = make_token(ec_private_key, sub="u-999")
+
+    # Make the mock return a different public key so signature verification fails
+    wrong_key = ec.generate_private_key(ec.SECP256R1()).public_key()
+    signing_key_mock = MagicMock()
+    signing_key_mock.key = wrong_key
+
+    with patch("src.auth.jwt.PyJWKClient") as mock_cls:
+        instance = MagicMock()
+        instance.get_signing_key_from_jwt.return_value = signing_key_mock
+        mock_cls.return_value = instance
+
+        with pytest.raises(AuthError):
+            verify_jwt(token, "https://fake.test/jwks.json")

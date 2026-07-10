@@ -1,11 +1,13 @@
 import os
 from datetime import UTC, datetime, timedelta
+from unittest.mock import MagicMock, patch
 
 # Set required env vars before any src imports trigger Settings validation
-os.environ.setdefault("SUPABASE_JWT_SECRET", "test-secret-for-tests-only-32bytes!!")
+os.environ.setdefault("SUPABASE_JWKS_URL", "https://fake.test/jwks.json")
 
 import jwt
 import pytest
+from cryptography.hazmat.primitives.asymmetric import ec
 from fastapi import Depends
 from fastapi.testclient import TestClient
 
@@ -13,11 +15,13 @@ from src.auth.dependencies import get_current_user
 from src.auth.models import CurrentUser
 from src.main import create_app
 
-_TEST_JWT_SECRET = "test-secret-for-tests-only-32bytes!!"
+# Generate a single EC keypair for the entire test session
+_PRIVATE_KEY = ec.generate_private_key(ec.SECP256R1())
+_PUBLIC_KEY = _PRIVATE_KEY.public_key()
 
 
 def make_token(
-    secret: str,
+    private_key: ec.EllipticCurvePrivateKey,
     *,
     sub: str = "user-123",
     exp_delta: timedelta = timedelta(hours=1),
@@ -28,12 +32,30 @@ def make_token(
         "exp": datetime.now(tz=UTC) + exp_delta,
         **extra,
     }
-    return jwt.encode(payload, secret, algorithm="HS256")
+    return jwt.encode(payload, private_key, algorithm="ES256")
 
 
 @pytest.fixture
-def jwt_secret() -> str:
-    return _TEST_JWT_SECRET
+def ec_private_key() -> ec.EllipticCurvePrivateKey:
+    return _PRIVATE_KEY
+
+
+@pytest.fixture
+def ec_public_key() -> ec.EllipticCurvePublicKey:
+    return _PUBLIC_KEY
+
+
+@pytest.fixture(autouse=True)
+def mock_jwks_client(ec_public_key):
+    """Patch PyJWKClient so tests never hit the network."""
+    signing_key_mock = MagicMock()
+    signing_key_mock.key = ec_public_key
+
+    with patch("src.auth.jwt.PyJWKClient") as mock_cls:
+        instance = MagicMock()
+        instance.get_signing_key_from_jwt.return_value = signing_key_mock
+        mock_cls.return_value = instance
+        yield mock_cls
 
 
 @pytest.fixture
