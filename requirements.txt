@@ -6,20 +6,39 @@ annotated-types==0.7.0
     # via pydantic
 anyio==4.14.1
     # via
+    #   httpx
     #   starlette
     #   watchfiles
+certifi==2026.6.17
+    # via
+    #   httpcore
+    #   httpx
+cffi==2.1.0 ; platform_python_implementation != 'PyPy'
+    # via cryptography
 click==8.4.2
     # via uvicorn
 colorama==0.4.6 ; sys_platform == 'win32'
     # via click
+cryptography==49.0.0
+    # via pyjwt
 fastapi==0.139.0
     # via vitia-ia
 h11==0.16.0
-    # via uvicorn
+    # via
+    #   httpcore
+    #   uvicorn
+httpcore==1.0.9
+    # via httpx
 httptools==0.8.0
     # via uvicorn
+httpx==0.28.1
+    # via vitia-ia
 idna==3.18
-    # via anyio
+    # via
+    #   anyio
+    #   httpx
+pycparser==3.0 ; implementation_name != 'PyPy' and platform_python_implementation != 'PyPy'
+    # via cffi
 pydantic==2.13.4
     # via
     #   fastapi
@@ -27,6 +46,8 @@ pydantic==2.13.4
 pydantic-core==2.46.4
     # via pydantic
 pydantic-settings==2.14.2
+    # via vitia-ia
+pyjwt==2.13.0
     # via vitia-ia
 python-dotenv==1.2.2
     # via
