@@ -77,6 +77,26 @@ API available at `http://localhost:8000` · Docs at `http://localhost:8000/docs`
 
 ---
 
+## AI Setup
+
+vitia-ia uses a provider-agnostic LLM adapter. Only the **active provider's** API key is required at startup.
+
+### Environment variables
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `LLM_PROVIDER` | No | `anthropic` | LLM provider to use. Currently only `anthropic` is supported. |
+| `ANTHROPIC_API_KEY` | Yes (when `LLM_PROVIDER=anthropic`) | — | Anthropic API key. Get one at [console.anthropic.com](https://console.anthropic.com/). |
+| `ANTHROPIC_MODEL` | No | `claude-opus-4-8` | Anthropic model name. Override to use a different Claude model. |
+
+### Switching provider
+
+Set `LLM_PROVIDER` to the desired provider name. Only the active provider's key is required — you do not need to configure keys for unused providers.
+
+> **Startup behavior:** If the active provider's API key is missing, the application fails immediately at startup with a `ValidationError`. If an unknown provider is configured, a `ValueError` is raised at the first call to the factory.
+
+---
+
 ## Development
 
 ```bash
