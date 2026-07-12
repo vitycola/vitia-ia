@@ -32,6 +32,8 @@ jobs:
 
       - name: Tests
         run: uv run pytest
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
       - name: Verify requirements.txt is in sync
         run: |

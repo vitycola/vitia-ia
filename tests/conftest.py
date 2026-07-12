@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 
 from src.auth.dependencies import get_current_user
 from src.auth.models import CurrentUser
+from src.config import get_settings
 from src.main import create_app
 
 # Generate a single EC keypair for the entire test session
@@ -68,3 +69,14 @@ def client() -> TestClient:
         return {"user_id": current_user.user_id}
 
     return TestClient(app)
+
+
+@pytest.fixture
+def settings(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
+    get_settings.cache_clear()
+    from src.config import Settings
+
+    s = Settings()
+    yield s
+    get_settings.cache_clear()
