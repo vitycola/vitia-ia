@@ -1,9 +1,10 @@
 from anthropic import AsyncAnthropic
+from anthropic.types import ToolParam
 
 from src.adapters.prompts import TEXT_PROMPT, VISION_PROMPT
 from src.domain.food import IdentifiedFoods
 
-TOOL = {
+TOOL: ToolParam = {
     "name": "record_identified_foods",
     "description": "Record the food items identified with weight and confidence.",
     "input_schema": {
