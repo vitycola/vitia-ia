@@ -20,7 +20,6 @@ def test_transcode_heic_calls_pillow_heif():
         fake_img = MagicMock()
         mock_frombytes.return_value = fake_img
 
-
         def fake_save(buf, **kwargs):
             buf.write(b"\xff\xd8\xff")  # minimal JPEG magic bytes
 

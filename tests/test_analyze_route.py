@@ -32,6 +32,7 @@ def _make_png() -> bytes:
     idat = zlib.compress(b"\x00\xff\x00\x00")
     return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", ihdr) + chunk(b"IDAT", idat) + chunk(b"IEND", b"")
 
+
 _PNG_BYTES = _make_png()
 
 _EMPTY_RESULT = MatchResult(items=[], totals=MacroTotals(), degraded=False)
@@ -100,6 +101,7 @@ def test_analyze_accepts_heic():
 
 def test_analyze_compresses_oversized_image():
     from unittest.mock import patch as _patch
+
     app = _make_app(_mock_service())
     big_data = b"\xff\xd8\xff" + b"\x00" * (4 * 1024 * 1024 + 1)
     compressed = b"\xff\xd8\xff" + b"\x00" * 100  # simulate compressed result
