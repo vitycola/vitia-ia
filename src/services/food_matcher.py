@@ -1,3 +1,4 @@
+import asyncio
 import unicodedata
 
 from rapidfuzz import fuzz, process
@@ -51,11 +52,16 @@ class FoodMatcherService:
         self._off = off_client
 
     async def match_all(self, foods: IdentifiedFoods) -> MatchResult:
-        items: list[MatchedFood] = []
         try:
-            for food in foods.items:
-                matched = await self._match_one(food)
-                items.append(matched)
+            results = await asyncio.gather(
+                *[self._match_one(food) for food in foods.items],
+                return_exceptions=True,
+            )
+            # If any coroutine raised, treat the whole batch as degraded.
+            for result in results:
+                if isinstance(result, BaseException):
+                    raise result
+            items: list[MatchedFood] = list(results)  # type: ignore[arg-type]
         except Exception:
             return MatchResult(
                 items=[],

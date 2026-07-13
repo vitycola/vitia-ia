@@ -7,6 +7,11 @@
   ],
   "routes": [
     {
+      "src": "/",
+      "status": 302,
+      "headers": { "Location": "/docs" }
+    },
+    {
       "src": "/(.*)",
       "dest": "src/main.py"
     }

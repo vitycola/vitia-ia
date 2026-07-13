@@ -23,16 +23,44 @@
 
 ## Architecture
 
-Clean layered architecture with a clear separation of concerns:
+vitia-ia follows a hexagonal (ports-and-adapters) architecture. The HTTP layer is thin; all business logic lives in services; external systems are hidden behind adapters.
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  HTTP (FastAPI routes)                                       │
+│  routes/food.py · routes/health.py                          │
+└────────────────────────────┬─────────────────────────────────┘
+                             │ depends on
+┌────────────────────────────▼─────────────────────────────────┐
+│  Application layer (services)                                │
+│  services/food_matcher.py  — orchestrates matching logic     │
+└──────┬────────────────────────────────────┬──────────────────┘
+       │ uses                               │ uses
+┌──────▼──────────┐               ┌─────────▼────────────────┐
+│  Adapters        │               │  Adapters                │
+│  supabase_client │               │  off_client              │
+│  claude_adapter  │               │  (OpenFoodFacts)         │
+│  (Anthropic AI)  │               │                          │
+└──────────────────┘               └──────────────────────────┘
+       │                                    │
+       ▼                                    ▼
+  Supabase DB                         OpenFoodFacts API
+  (generic_foods)                      (public REST)
+
+Infrastructure:
+  Vercel — serverless ASGI host (python runtime)
+  GitHub Actions — CI (lint, test, type-check) + CD (deploy to Vercel on main push)
+```
 
 ```
 src/
 ├── main.py          # App factory — wires middleware, routers, lifespan
-├── config.py        # Typed settings via pydantic-settings
-├── routes/          # HTTP layer — FastAPI routers
+├── config.py        # Typed settings via pydantic-settings (fail-fast on missing vars)
+├── auth/            # JWT verification (ES256 + JWKS) and FastAPI dependency
+├── routes/          # HTTP layer — FastAPI routers (thin controllers)
 ├── services/        # Application layer — use cases and orchestration
-├── adapters/        # Infrastructure layer — external integrations
-└── domain/          # Domain models and business rules
+├── adapters/        # Infrastructure layer — Supabase, OpenFoodFacts, Anthropic
+└── domain/          # Pydantic domain models and validation rules
 ```
 
 The app is exposed as a single ASGI callable (`app = create_app()`) that Vercel picks up and runs as a serverless function — no server management required.
@@ -67,33 +95,25 @@ API available at `http://localhost:8000` · Docs at `http://localhost:8000/docs`
 
 ## Environment variables
 
+Copy `.env.example` to `.env` and fill in real values before running locally.
+
 | Variable | Required | Default | Description |
 |---|---|---|---|
+| `SUPABASE_URL` | Yes | — | Supabase project URL — e.g. `https://<project-id>.supabase.co` |
+| `SUPABASE_ANON_KEY` | Yes | — | Supabase anonymous (public) API key |
+| `SUPABASE_JWKS_URL` | Yes | — | JWKS endpoint for JWT verification — `https://<project-id>.supabase.co/auth/v1/.well-known/jwks.json` |
+| `ANTHROPIC_API_KEY` | Yes | — | Anthropic API key (required when `LLM_PROVIDER=anthropic`) |
+| `LLM_PROVIDER` | No | `anthropic` | LLM provider. Currently only `anthropic` is supported. |
+| `ANTHROPIC_MODEL` | No | `claude-opus-4-8` | Anthropic model name. |
 | `ALLOWED_ORIGINS` | Yes (prod) | `[]` | Comma-separated CORS origins — e.g. `https://vitia.app` |
 | `APP_NAME` | No | `vitia-ia` | Application display name |
 | `LOG_LEVEL` | No | `INFO` | Log level: `DEBUG` · `INFO` · `WARNING` · `ERROR` |
 
+> **Startup behavior:** The app validates all required vars at startup and raises a `ValueError` immediately if any are missing — you will not get a cryptic runtime error later.
+>
 > **CORS note:** `ALLOWED_ORIGINS` must be set to the exact frontend origin(s) in production. An empty list blocks all cross-origin requests.
 
 ---
-
-## AI Setup
-
-vitia-ia uses a provider-agnostic LLM adapter. Only the **active provider's** API key is required at startup.
-
-### Environment variables
-
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `LLM_PROVIDER` | No | `anthropic` | LLM provider to use. Currently only `anthropic` is supported. |
-| `ANTHROPIC_API_KEY` | Yes (when `LLM_PROVIDER=anthropic`) | — | Anthropic API key. Get one at [console.anthropic.com](https://console.anthropic.com/). |
-| `ANTHROPIC_MODEL` | No | `claude-opus-4-8` | Anthropic model name. Override to use a different Claude model. |
-
-### Switching provider
-
-Set `LLM_PROVIDER` to the desired provider name. Only the active provider's key is required — you do not need to configure keys for unused providers.
-
-> **Startup behavior:** If the active provider's API key is missing, the application fails immediately at startup with a `ValidationError`. If an unknown provider is configured, a `ValueError` is raised at the first call to the factory.
 
 ---
 
@@ -138,13 +158,35 @@ Commit the updated file alongside `uv.lock`. CI will catch any drift automatical
 
 ---
 
+## Supabase schema
+
+vitia-ia reads from a single table in Supabase: `generic_foods`.
+
+### `generic_foods`
+
+| Column | Type | Description |
+|---|---|---|
+| `id` | uuid / serial | Primary key |
+| `name` | text | Human-readable food name (e.g. `"Chicken breast, cooked"`) |
+| `name_normalized` | text | Lowercased, accent-stripped name used for fuzzy search |
+| `category` | text | Food category (e.g. `"meat"`, `"dairy"`) |
+| `calories_per_100g` | numeric | Energy per 100 g in kcal |
+| `protein_per_100g` | numeric | Protein per 100 g in grams |
+| `carbs_per_100g` | numeric | Carbohydrates per 100 g in grams |
+| `fat_per_100g` | numeric | Fat per 100 g in grams |
+
+The service queries `name_normalized` with a case-insensitive `ilike` filter, retrieves up to 10 candidates, and uses `rapidfuzz` token-sort-ratio to pick the best match above a 70-point threshold. Rows below the threshold fall through to the OpenFoodFacts REST fallback.
+
+---
+
 ## API
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | `GET` | `/health` | Public | Health check — returns `{"status": "ok"}` |
-| `GET` | `/docs` | Public | Swagger UI — interactive API explorer |
-| `POST` | `/food/match` | Bearer JWT | Match identified foods to nutritional database entries |
+| `GET` | `/docs` | Public | Swagger UI — interactive API explorer (FastAPI auto-generated) |
+| `GET` | `/redoc` | Public | ReDoc — alternative API documentation viewer |
+| `POST` | `/food/match` | Bearer JWT (Supabase) | Match identified foods against the nutritional database; returns macros per item and totals |
 
 ### `POST /food/match`
 

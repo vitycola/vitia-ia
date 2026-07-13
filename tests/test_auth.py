@@ -85,10 +85,10 @@ def test_verify_jwt_wrong_key(ec_private_key: ec.EllipticCurvePrivateKey) -> Non
     signing_key_mock = MagicMock()
     signing_key_mock.key = wrong_key
 
-    with patch("src.auth.jwt.PyJWKClient") as mock_cls:
+    with patch("src.auth.jwt._get_jwks_client") as mock_get_client:
         instance = MagicMock()
         instance.get_signing_key_from_jwt.return_value = signing_key_mock
-        mock_cls.return_value = instance
+        mock_get_client.return_value = instance
 
         with pytest.raises(AuthError):
             verify_jwt(token, "https://fake.test/jwks.json")
