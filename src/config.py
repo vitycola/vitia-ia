@@ -1,5 +1,7 @@
 from functools import lru_cache
 
+MAX_IMAGE_BYTES = 4 * 1024 * 1024  # 4 MiB
+
 from pydantic import SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
