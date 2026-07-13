@@ -13,7 +13,8 @@ class TranscodeError(Exception):
 def transcode_heic_to_jpeg(data: bytes) -> bytes:
     try:
         heif_file = pillow_heif.read_heif(data)
-        image = Image.frombytes(heif_file.mode, heif_file.size, heif_file.data, "raw")
+        raw_data = bytes(heif_file.data) if heif_file.data is not None else b""
+        image = Image.frombytes(heif_file.mode, heif_file.size, raw_data, "raw")
         buf = io.BytesIO()
         image.save(buf, format="JPEG", quality=85)
         return buf.getvalue()
@@ -40,7 +41,7 @@ def compress_to_limit(data: bytes, max_bytes: int) -> bytes:
     w, h = image.size
     if max(w, h) > _MAX_DIMENSION:
         scale = _MAX_DIMENSION / max(w, h)
-        image = image.resize((int(w * scale), int(h * scale)), Image.LANCZOS)
+        image = image.resize((int(w * scale), int(h * scale)), Image.Resampling.LANCZOS)
 
     for quality in (85, 75, 60, 40):
         buf = io.BytesIO()
@@ -50,7 +51,7 @@ def compress_to_limit(data: bytes, max_bytes: int) -> bytes:
             return result
 
     # Last resort: very aggressive resize + lowest quality
-    image = image.resize((image.width // 2, image.height // 2), Image.LANCZOS)
+    image = image.resize((image.width // 2, image.height // 2), Image.Resampling.LANCZOS)
     buf = io.BytesIO()
     image.save(buf, format="JPEG", quality=30, optimize=True)
     return buf.getvalue()

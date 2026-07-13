@@ -1,5 +1,6 @@
 """Tests for PhotoAnalysisService."""
 
+from typing import cast
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -33,7 +34,7 @@ async def test_analyze_jpeg_happy_path():
         correlation_id="test-id",
     )
     assert isinstance(result, MatchResult)
-    service.llm.analyze_image.assert_called_once()
+    cast(AsyncMock, service.llm.analyze_image).assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -54,7 +55,7 @@ async def test_analyze_heic_transcodes_first():
     mock_tc.assert_called_once_with(b"heic-bytes")
     assert isinstance(result, MatchResult)
     # Verify jpeg was passed to llm (media_type changed to image/jpeg)
-    call_kwargs = service.llm.analyze_image.call_args
+    call_kwargs = cast(AsyncMock, service.llm.analyze_image).call_args
     assert call_kwargs.kwargs.get("media_type") == "image/jpeg" or call_args_has_jpeg(call_kwargs)
 
 

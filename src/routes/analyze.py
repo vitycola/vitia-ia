@@ -27,18 +27,19 @@ logger = logging.getLogger("vitia.analyze")
 # On platforms where it is unavailable (e.g. Vercel Python runtime), we fall
 # back to the client-declared Content-Type.
 try:
-    import magic as _magic
+    import magic as _magic_mod
 
     _MAGIC_AVAILABLE = True
 except (ImportError, OSError):
+    _magic_mod = None  # type: ignore[assignment]
     _MAGIC_AVAILABLE = False
 
 
 def sniff_mime(data: bytes, declared: str | None) -> str:
     """Return the detected MIME type, falling back to the declared one."""
-    if _MAGIC_AVAILABLE:
+    if _MAGIC_AVAILABLE and _magic_mod is not None:
         try:
-            detected = _magic.from_buffer(data, mime=True)
+            detected = _magic_mod.from_buffer(data, mime=True)
             if detected and detected != "application/octet-stream":
                 return detected
         except Exception:
