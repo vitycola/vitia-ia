@@ -62,8 +62,8 @@ async def get_photo_analysis_service() -> AsyncGenerator[PhotoAnalysisService, N
 
 @router.post("/analyze", response_model=MatchResult)
 async def analyze_photo(
-    image: UploadFile = File(...),
-    meal_context: str | None = Form(None),
+    image: UploadFile = File(...),  # noqa: B008
+    meal_context: str | None = Form(None),  # noqa: B008
     service: PhotoAnalysisService = Depends(get_photo_analysis_service),  # noqa: B008
     _user: CurrentUser = Depends(get_current_user),  # noqa: B008
 ) -> MatchResult:
@@ -87,7 +87,11 @@ async def analyze_photo(
     if mime not in ALLOWED_MIMES:
         logger.warning(
             "validation_failed",
-            extra={"correlation_id": correlation_id, "reason": "unsupported_mime", "mime_type": mime},
+            extra={
+                "correlation_id": correlation_id,
+                "reason": "unsupported_mime",
+                "mime_type": mime,
+            },
         )
         raise HTTPException(
             status_code=415,
@@ -97,7 +101,11 @@ async def analyze_photo(
     if len(data) > MAX_IMAGE_BYTES:
         logger.info(
             "image_compressing",
-            extra={"correlation_id": correlation_id, "original_size_bytes": len(data), "limit_bytes": MAX_IMAGE_BYTES},
+            extra={
+                "correlation_id": correlation_id,
+                "original_size_bytes": len(data),
+                "limit_bytes": MAX_IMAGE_BYTES,
+            },
         )
         data = compress_to_limit(data, MAX_IMAGE_BYTES)
         logger.info(
@@ -118,8 +126,10 @@ async def analyze_photo(
             extra={"correlation_id": correlation_id, "error_message": str(exc)},
         )
         raise HTTPException(status_code=422, detail=f"Could not process image: {exc}") from exc
-    except LLMTimeoutError:
-        raise HTTPException(status_code=504, detail="LLM request timed out. Please try again.")
+    except LLMTimeoutError as exc:
+        raise HTTPException(
+            status_code=504, detail="LLM request timed out. Please try again."
+        ) from exc
     except LLMError as exc:
         raise HTTPException(status_code=502, detail=f"LLM error: {exc}") from exc
 

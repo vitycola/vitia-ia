@@ -1,10 +1,10 @@
 """Tests for POST /api/analyze route."""
 
-import io
 import pathlib
+import struct
+import zlib
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from fastapi.testclient import TestClient
 
 from src.auth.dependencies import get_current_user
@@ -21,7 +21,7 @@ _FIXTURE_DIR = pathlib.Path(__file__).parent / "fixtures"
 _JPEG_BYTES = (_FIXTURE_DIR / "test_food.jpg").read_bytes()
 
 # Minimal 1x1 PNG
-import struct, zlib
+
 
 def _make_png() -> bytes:
     def chunk(name, data):
@@ -104,7 +104,9 @@ def test_analyze_compresses_oversized_image():
     big_data = b"\xff\xd8\xff" + b"\x00" * (4 * 1024 * 1024 + 1)
     compressed = b"\xff\xd8\xff" + b"\x00" * 100  # simulate compressed result
     with patch("src.routes.analyze.sniff_mime", return_value="image/jpeg"):
-        with _patch("src.routes.analyze.compress_to_limit", return_value=compressed) as mock_compress:
+        with _patch(
+            "src.routes.analyze.compress_to_limit", return_value=compressed
+        ) as mock_compress:
             with TestClient(app) as client:
                 resp = client.post(
                     "/api/analyze",

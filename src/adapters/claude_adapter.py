@@ -44,7 +44,9 @@ class ClaudeAdapter:
         block = next(b for b in resp.content if b.type == "tool_use")
         return IdentifiedFoods.model_validate(block.input)
 
-    async def analyze_image(self, image_b64: str, media_type: str, context: str | None = None) -> IdentifiedFoods:
+    async def analyze_image(
+        self, image_b64: str, media_type: str, context: str | None = None
+    ) -> IdentifiedFoods:
         prompt = VISION_PROMPT
         if context:
             prompt = f"{VISION_PROMPT}\n\nUser context: {context}"

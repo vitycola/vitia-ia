@@ -1,7 +1,6 @@
 """Tests for PhotoAnalysisService."""
 
-import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -42,7 +41,9 @@ async def test_analyze_heic_transcodes_first():
     service = _make_service()
     fake_jpeg = b"\xff\xd8\xff" + b"\x00" * 50
 
-    with patch("src.services.photo_analysis.transcode_heic_to_jpeg", return_value=fake_jpeg) as mock_tc:
+    with patch(
+        "src.services.photo_analysis.transcode_heic_to_jpeg", return_value=fake_jpeg
+    ) as mock_tc:
         result = await service.analyze(
             image_bytes=b"heic-bytes",
             media_type="image/heic",
@@ -83,7 +84,7 @@ async def test_analyze_transcode_error_propagates():
 @pytest.mark.asyncio
 async def test_analyze_llm_timeout_raises():
     llm = AsyncMock()
-    llm.analyze_image = AsyncMock(side_effect=asyncio.TimeoutError())
+    llm.analyze_image = AsyncMock(side_effect=TimeoutError())
     service = _make_service(llm=llm)
     with pytest.raises(LLMTimeoutError):
         await service.analyze(

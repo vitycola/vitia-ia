@@ -1,4 +1,3 @@
-import asyncio
 import base64
 import logging
 import time
@@ -6,7 +5,7 @@ import time
 from src.adapters.llm_adapter import LLMAdapter
 from src.domain.food import MatchResult
 from src.services.food_matcher import FoodMatcherService
-from src.utils.image import TranscodeError, transcode_heic_to_jpeg
+from src.utils.image import transcode_heic_to_jpeg
 
 logger = logging.getLogger("vitia.analyze")
 
@@ -53,7 +52,7 @@ class PhotoAnalysisService:
         logger.info("llm_start", extra={"correlation_id": correlation_id})
         try:
             foods = await self.llm.analyze_image(image_b64, media_type, context=meal_context)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.error(
                 "llm_error",
                 extra={
@@ -62,7 +61,7 @@ class PhotoAnalysisService:
                     "error_type": "timeout",
                 },
             )
-            raise LLMTimeoutError()
+            raise LLMTimeoutError() from None
         except Exception as e:
             logger.error(
                 "llm_error",
@@ -73,7 +72,7 @@ class PhotoAnalysisService:
                     "error_message": str(e),
                 },
             )
-            raise LLMError(str(e))
+            raise LLMError(str(e)) from e
         logger.info(
             "llm_end",
             extra={
