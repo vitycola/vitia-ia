@@ -3,13 +3,12 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from src.auth.dependencies import get_current_user
 from src.auth.models import CurrentUser
 from src.domain.food import MacroTotals, MatchResult
-from fastapi import FastAPI
-
 from src.main import create_app
 from src.routes.food import get_food_matcher_service
 
