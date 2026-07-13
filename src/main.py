@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.config import get_settings
-from src.routes import health
+from src.routes import food, health
 
 
 @asynccontextmanager
@@ -31,6 +31,7 @@ def create_app(allowed_origins: list[str] | None = None) -> FastAPI:
     )
 
     application.include_router(health.router)
+    application.include_router(food.router)
 
     return application
 
