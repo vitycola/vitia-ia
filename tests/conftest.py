@@ -29,11 +29,17 @@ def make_token(
     *,
     sub: str = "user-123",
     exp_delta: timedelta = timedelta(hours=1),
+    aud: str = "authenticated",
+    iss: str | None = None,
     **extra: object,
 ) -> str:
+    if iss is None:
+        iss = f"{get_settings().supabase_url}/auth/v1"
     payload = {
         "sub": sub,
         "exp": datetime.now(tz=UTC) + exp_delta,
+        "aud": aud,
+        "iss": iss,
         **extra,
     }
     return jwt.encode(payload, private_key, algorithm="ES256")

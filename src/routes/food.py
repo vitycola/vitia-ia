@@ -6,6 +6,8 @@ from fastapi import APIRouter, Depends
 
 from src.adapters.off_client import OFFFallbackClient
 from src.adapters.supabase_client import GenericFoodRepository
+from src.auth.dependencies import get_current_user
+from src.auth.models import CurrentUser
 from src.config import get_settings
 from src.domain.food import IdentifiedFoods, MatchResult
 from src.services.food_matcher import FoodMatcherService
@@ -35,5 +37,6 @@ async def get_food_matcher_service() -> AsyncGenerator[FoodMatcherService, None]
 async def match_foods(
     body: IdentifiedFoods,
     service: FoodMatcherService = Depends(get_food_matcher_service),  # noqa: B008
+    _user: CurrentUser = Depends(get_current_user),  # noqa: B008
 ) -> MatchResult:
     return await service.match_all(body)

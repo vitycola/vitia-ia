@@ -34,6 +34,9 @@ jobs:
         run: uv run pytest
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SUPABASE_URL: https://test.supabase.co
+          SUPABASE_ANON_KEY: dummy-anon-key
+          SUPABASE_JWKS_URL: https://test.supabase.co/auth/v1/.well-known/jwks.json
 
       - name: Verify requirements.txt is in sync
         run: |
