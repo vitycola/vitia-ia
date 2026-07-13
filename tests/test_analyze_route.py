@@ -98,16 +98,20 @@ def test_analyze_accepts_heic():
     assert resp.status_code == 200
 
 
-def test_analyze_rejects_oversized():
+def test_analyze_compresses_oversized_image():
+    from unittest.mock import patch as _patch
     app = _make_app(_mock_service())
     big_data = b"\xff\xd8\xff" + b"\x00" * (4 * 1024 * 1024 + 1)
+    compressed = b"\xff\xd8\xff" + b"\x00" * 100  # simulate compressed result
     with patch("src.routes.analyze.sniff_mime", return_value="image/jpeg"):
-        with TestClient(app) as client:
-            resp = client.post(
-                "/api/analyze",
-                files={"image": ("big.jpg", big_data, "image/jpeg")},
-            )
-    assert resp.status_code == 413
+        with _patch("src.routes.analyze.compress_to_limit", return_value=compressed) as mock_compress:
+            with TestClient(app) as client:
+                resp = client.post(
+                    "/api/analyze",
+                    files={"image": ("big.jpg", big_data, "image/jpeg")},
+                )
+    mock_compress.assert_called_once()
+    assert resp.status_code == 200
 
 
 def test_analyze_happy_path_returns_match_result():

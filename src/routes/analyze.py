@@ -15,7 +15,7 @@ from src.config import MAX_IMAGE_BYTES, get_settings
 from src.domain.food import MatchResult
 from src.services.food_matcher import FoodMatcherService
 from src.services.photo_analysis import LLMError, LLMTimeoutError, PhotoAnalysisService
-from src.utils.image import TranscodeError
+from src.utils.image import TranscodeError, compress_to_limit
 
 router = APIRouter(prefix="/api", tags=["analyze"])
 
@@ -95,13 +95,14 @@ async def analyze_photo(
         )
 
     if len(data) > MAX_IMAGE_BYTES:
-        logger.warning(
-            "validation_failed",
-            extra={"correlation_id": correlation_id, "reason": "too_large", "size_bytes": len(data)},
+        logger.info(
+            "image_compressing",
+            extra={"correlation_id": correlation_id, "original_size_bytes": len(data), "limit_bytes": MAX_IMAGE_BYTES},
         )
-        raise HTTPException(
-            status_code=413,
-            detail=f"Image exceeds maximum size of {MAX_IMAGE_BYTES // (1024 * 1024)} MiB.",
+        data = compress_to_limit(data, MAX_IMAGE_BYTES)
+        logger.info(
+            "image_compressed",
+            extra={"correlation_id": correlation_id, "compressed_size_bytes": len(data)},
         )
 
     try:
