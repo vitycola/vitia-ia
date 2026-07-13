@@ -8,9 +8,7 @@ class Settings(BaseSettings):
     app_name: str = "vitia-ia"
     allowed_origins: list[str] = []
     log_level: str = "INFO"
-    supabase_jwks_url: str = (
-        "https://uynyfvvhlesklvdwyxlv.supabase.co/auth/v1/.well-known/jwks.json"
-    )
+    supabase_jwks_url: str = ""
 
     # Supabase settings
     supabase_url: str = ""
@@ -22,6 +20,16 @@ class Settings(BaseSettings):
     anthropic_model: str = "claude-opus-4-8"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    @model_validator(mode="after")
+    def _require_supabase_vars(self) -> "Settings":
+        if not self.supabase_url:
+            raise ValueError("SUPABASE_URL is required but not set.")
+        if not self.supabase_anon_key.get_secret_value():
+            raise ValueError("SUPABASE_ANON_KEY is required but not set.")
+        if not self.supabase_jwks_url:
+            raise ValueError("SUPABASE_JWKS_URL is required but not set.")
+        return self
 
     @model_validator(mode="after")
     def _require_active_key(self) -> "Settings":
