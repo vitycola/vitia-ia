@@ -8,6 +8,8 @@ from fastapi.testclient import TestClient
 from src.auth.dependencies import get_current_user
 from src.auth.models import CurrentUser
 from src.domain.food import MacroTotals, MatchResult
+from fastapi import FastAPI
+
 from src.main import create_app
 from src.routes.food import get_food_matcher_service
 
@@ -83,7 +85,7 @@ def test_valid_request_returns_200(matched_service) -> None:
     assert body["degraded"] is False
 
 
-def _make_app_no_service() -> object:
+def _make_app_no_service() -> FastAPI:
     app = create_app()
     app.dependency_overrides[get_current_user] = lambda: _DUMMY_USER
     return app
