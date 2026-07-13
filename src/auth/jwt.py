@@ -1,3 +1,5 @@
+from functools import lru_cache
+
 import jwt
 from jwt import PyJWKClient
 
@@ -10,12 +12,18 @@ class AuthError(Exception):
         super().__init__(reason)
 
 
+@lru_cache(maxsize=1)
+def _get_jwks_client(jwks_url: str) -> PyJWKClient:
+    """Return a cached PyJWKClient instance for the given JWKS URL."""
+    return PyJWKClient(jwks_url)
+
+
 def verify_jwt(token: str, jwks_url: str) -> dict:
     """Decode and verify an ES256 JWT using JWKS. Raises AuthError on any failure."""
     try:
         settings = get_settings()
         issuer = f"{settings.supabase_url}/auth/v1"
-        jwks_client = PyJWKClient(jwks_url)
+        jwks_client = _get_jwks_client(jwks_url)
         signing_key = jwks_client.get_signing_key_from_jwt(token)
         return jwt.decode(
             token,
