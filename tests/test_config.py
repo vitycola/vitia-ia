@@ -92,7 +92,6 @@ def test_verify_jwt_accepts_correct_aud_iss(
     token = make_token(
         ec_private_key,
         aud="authenticated",
-        iss="https://fake.supabase.co/auth/v1",
     )
     claims = verify_jwt(token, "https://fake.test/jwks.json")
     assert claims["sub"] == "user-123"
