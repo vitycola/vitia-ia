@@ -6,9 +6,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 try:
-    from pythonjsonlogger import json as _jsonlogger
+    from pythonjsonlogger.json import (
+        JsonFormatter as _JsonFormatter,  # type: ignore[import-not-found]
+    )
 except ImportError:
-    from pythonjsonlogger import jsonlogger as _jsonlogger  # type: ignore[no-redef]
+    from pythonjsonlogger.jsonlogger import (
+        JsonFormatter as _JsonFormatter,  # type: ignore[no-redef,import-not-found]
+    )
 
 from src.config import get_settings
 from src.routes import analyze, food, health
@@ -18,12 +22,12 @@ def _configure_logging() -> None:
     logger = logging.getLogger("vitia")
     already_configured = any(
         isinstance(h, logging.StreamHandler)
-        and isinstance(getattr(h, "formatter", None), _jsonlogger.JsonFormatter)
+        and isinstance(getattr(h, "formatter", None), _JsonFormatter)
         for h in logger.handlers
     )
     if not already_configured:
         handler = logging.StreamHandler()
-        formatter = _jsonlogger.JsonFormatter(
+        formatter = _JsonFormatter(
             fmt="%(asctime)s %(name)s %(levelname)s %(message)s",
         )
         handler.setFormatter(formatter)
