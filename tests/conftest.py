@@ -4,6 +4,9 @@ from unittest.mock import MagicMock, patch
 
 # Set required env vars before any src imports trigger Settings validation
 os.environ.setdefault("SUPABASE_JWKS_URL", "https://fake.test/jwks.json")
+os.environ.setdefault("SUPABASE_URL", "https://fake.supabase.co")
+os.environ.setdefault("SUPABASE_ANON_KEY", "fake-anon-key")
+os.environ.setdefault("ANTHROPIC_API_KEY", "sk-ant-test")
 
 import jwt
 import pytest

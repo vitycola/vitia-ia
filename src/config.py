@@ -12,6 +12,10 @@ class Settings(BaseSettings):
         "https://uynyfvvhlesklvdwyxlv.supabase.co/auth/v1/.well-known/jwks.json"
     )
 
+    # Supabase settings
+    supabase_url: str
+    supabase_anon_key: SecretStr
+
     # LLM settings
     llm_provider: str = "anthropic"
     anthropic_api_key: SecretStr | None = None
