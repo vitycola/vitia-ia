@@ -140,8 +140,57 @@ Commit the updated file alongside `uv.lock`. CI will catch any drift automatical
 
 ## API
 
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/health` | Health check — returns `{"status": "ok"}` |
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `GET` | `/health` | Public | Health check — returns `{"status": "ok"}` |
+| `GET` | `/docs` | Public | Swagger UI — interactive API explorer |
+| `POST` | `/food/match` | Bearer JWT | Match identified foods to nutritional database entries |
+
+### `POST /food/match`
+
+Requires a valid Supabase-issued JWT in the `Authorization: Bearer <token>` header.
+
+**Request body**
+
+```json
+{
+  "items": [
+    {
+      "name": "chicken breast",
+      "estimated_grams": 150.0,
+      "confidence": 0.9
+    }
+  ]
+}
+```
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `items[].name` | string | Yes | Food name as identified by the AI |
+| `items[].estimated_grams` | number | Yes | Estimated portion size in grams |
+| `items[].confidence` | number | Yes | Confidence score from the AI (0–1) |
+
+**Response**
+
+```json
+{
+  "items": [
+    {
+      "query_name": "chicken breast",
+      "grams": 150.0,
+      "source": "supabase",
+      "matched_name": "Chicken breast, cooked",
+      "score": 92.5,
+      "macros_per_100g": { "calories": 165, "protein": 31, "carbs": 0, "fat": 3.6 },
+      "macros_actual": { "calories": 247.5, "protein": 46.5, "carbs": 0, "fat": 5.4 },
+      "low_confidence": false
+    }
+  ],
+  "totals": { "calories": 247.5, "protein": 46.5, "carbs": 0, "fat": 5.4 },
+  "degraded": false
+}
+```
+
+`degraded: true` indicates the Supabase lookup failed and the OFF fallback was used.
 
 Interactive docs: `/docs` (Swagger UI) · `/redoc` (ReDoc)
