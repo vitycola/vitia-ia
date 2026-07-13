@@ -4,18 +4,14 @@ import time
 
 from src.adapters.llm_adapter import LLMAdapter
 from src.domain.food import MatchResult
+from src.services.errors import LLMError, LLMTimeoutError
 from src.services.food_matcher import FoodMatcherService
 from src.utils.image import transcode_heic_to_jpeg
 
 logger = logging.getLogger("vitia.analyze")
 
-
-class LLMTimeoutError(Exception):
-    pass
-
-
-class LLMError(Exception):
-    pass
+# Re-export for backward compatibility with existing callers
+__all__ = ["LLMError", "LLMTimeoutError", "PhotoAnalysisService"]
 
 
 class PhotoAnalysisService:

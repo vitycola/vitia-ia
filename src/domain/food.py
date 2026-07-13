@@ -42,3 +42,4 @@ class MatchResult(BaseModel):
     items: list[MatchedFood] = Field(default_factory=list)
     totals: MacroTotals
     degraded: bool = False
+    skipped: list[str] = Field(default_factory=list)
