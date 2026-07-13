@@ -122,7 +122,7 @@ async def test_parse_colloquial_quantity_resolved_by_llm():
 
     assert len(result.items) == 1
     assert result.skipped == []
-    llm_call_args = service.llm.parse_text.call_args
+    llm_call_args = service.llm.parse_text.call_args  # type: ignore[union-attr]
     assert llm_call_args.args[0] == "un yogur de postre"
 
 
