@@ -3,6 +3,8 @@ from functools import lru_cache
 from pydantic import SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+MAX_IMAGE_BYTES = 4 * 1024 * 1024  # 4 MiB
+
 
 class Settings(BaseSettings):
     app_name: str = "vitia-ia"
