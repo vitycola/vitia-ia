@@ -8,8 +8,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from src.adapters.factory import get_llm_adapter
-from src.adapters.supabase_client import GenericFoodRepository
 from src.adapters.off_client import OFFFallbackClient
+from src.adapters.supabase_client import GenericFoodRepository
 from src.auth.dependencies import get_current_user
 from src.auth.models import CurrentUser
 from src.config import get_settings

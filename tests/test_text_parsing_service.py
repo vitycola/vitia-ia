@@ -7,8 +7,8 @@ import pytest
 from src.domain.food import (
     IdentifiedFood,
     IdentifiedFoods,
-    MacroTotals,
     MacrosPer100g,
+    MacroTotals,
     MatchedFood,
     MatchResult,
 )
@@ -48,8 +48,10 @@ def _make_service(
         llm.parse_text = AsyncMock(return_value=foods)
 
     matcher = AsyncMock()
-    result = matcher_result if matcher_result is not None else MatchResult(
-        items=[], totals=MacroTotals(), degraded=False
+    result = (
+        matcher_result
+        if matcher_result is not None
+        else MatchResult(items=[], totals=MacroTotals(), degraded=False)
     )
     matcher.match_all = AsyncMock(return_value=result)
 

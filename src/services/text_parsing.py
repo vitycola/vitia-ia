@@ -2,7 +2,7 @@ import logging
 import time
 
 from src.adapters.llm_adapter import LLMAdapter
-from src.domain.food import MacroTotals, MatchResult, MatchedFood
+from src.domain.food import MacroTotals, MatchedFood, MatchResult
 from src.services.errors import LLMError, LLMTimeoutError
 from src.services.food_matcher import FoodMatcherService
 

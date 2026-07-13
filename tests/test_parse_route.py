@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 
 from src.auth.dependencies import get_current_user
 from src.auth.models import CurrentUser
-from src.domain.food import MacroTotals, MacrosPer100g, MatchedFood, MatchResult
+from src.domain.food import MacrosPer100g, MacroTotals, MatchedFood, MatchResult
 from src.main import create_app
 from src.routes.parse import get_text_parsing_service
 from src.services.errors import LLMError, LLMTimeoutError
