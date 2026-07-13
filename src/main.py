@@ -15,7 +15,7 @@ except ImportError:
     )
 
 from src.config import get_settings
-from src.routes import analyze, food, health
+from src.routes import analyze, food, health, parse
 
 
 def _configure_logging() -> None:
@@ -63,6 +63,7 @@ def create_app(allowed_origins: list[str] | None = None) -> FastAPI:
     application.include_router(health.router)
     application.include_router(food.router)
     application.include_router(analyze.router)
+    application.include_router(parse.router)
 
     return application
 
