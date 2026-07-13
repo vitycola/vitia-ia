@@ -13,8 +13,8 @@ class Settings(BaseSettings):
     )
 
     # Supabase settings
-    supabase_url: str
-    supabase_anon_key: SecretStr
+    supabase_url: str = ""
+    supabase_anon_key: SecretStr = SecretStr("")
 
     # LLM settings
     llm_provider: str = "anthropic"
