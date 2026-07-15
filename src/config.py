@@ -9,6 +9,7 @@ MAX_IMAGE_BYTES = 4 * 1024 * 1024  # 4 MiB
 class Settings(BaseSettings):
     app_name: str = "vitia-ia"
     allowed_origins: list[str] = []
+    allowed_origins_regex: str = ""
     log_level: str = "INFO"
     supabase_jwks_url: str = ""
 
