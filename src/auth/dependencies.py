@@ -16,6 +16,10 @@ async def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),  # noqa: B008
     settings: Settings = Depends(get_settings),  # noqa: B008
 ) -> CurrentUser:
+    if settings.auth_disabled:
+        logger.warning("auth_disabled — skipping JWT validation (dev only)")
+        return CurrentUser(user_id="dev-user")
+
     if credentials is None:
         raise HTTPException(
             status_code=401,

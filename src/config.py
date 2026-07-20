@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     supabase_url: str = ""
     supabase_anon_key: SecretStr = SecretStr("")
 
+    # Dev only — disables JWT auth entirely. NEVER set in production.
+    auth_disabled: bool = False
+
     # LLM settings
     llm_provider: str = "anthropic"
     anthropic_api_key: SecretStr | None = None
@@ -26,6 +29,8 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _require_supabase_vars(self) -> "Settings":
+        if self.auth_disabled:
+            return self
         if not self.supabase_url:
             raise ValueError("SUPABASE_URL is required but not set.")
         if not self.supabase_anon_key.get_secret_value():
