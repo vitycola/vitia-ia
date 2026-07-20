@@ -37,7 +37,13 @@ def verify_jwt(token: str, jwks_url: str) -> dict:
         raise AuthError(reason="expired") from err
     except jwt.InvalidSignatureError as err:
         raise AuthError(reason="invalid_signature") from err
+    except jwt.InvalidAudienceError as err:
+        raise AuthError(reason="invalid_audience") from err
+    except jwt.InvalidIssuerError as err:
+        raise AuthError(reason="invalid_issuer") from err
+    except jwt.DecodeError as err:
+        raise AuthError(reason="decode_error") from err
     except (jwt.InvalidTokenError, jwt.PyJWTError) as err:
-        raise AuthError(reason="malformed") from err
+        raise AuthError(reason=f"invalid_token:{type(err).__name__}") from err
     except Exception as err:
-        raise AuthError(reason="jwks_error") from err
+        raise AuthError(reason=f"jwks_error:{type(err).__name__}") from err

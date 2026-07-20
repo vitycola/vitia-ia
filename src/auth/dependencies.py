@@ -40,9 +40,14 @@ async def get_current_user(
             "auth_failed",
             extra={"reason": err.reason, "jwks_url": settings.supabase_jwks_url},
         )
+        detail = (
+            f"Auth failed: {err.reason}"
+            if settings.environment != "production"
+            else "Could not validate credentials"
+        )
         raise HTTPException(
             status_code=401,
-            detail="Could not validate credentials",
+            detail=detail,
             headers={"WWW-Authenticate": "Bearer"},
         ) from err
 
