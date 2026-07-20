@@ -17,6 +17,8 @@ async def get_current_user(
     settings: Settings = Depends(get_settings),  # noqa: B008
 ) -> CurrentUser:
     if settings.auth_disabled:
+        if settings.environment == "production":
+            raise RuntimeError("AUTH_DISABLED cannot be set in production environment")
         logger.warning("auth_disabled — skipping JWT validation (dev only)")
         return CurrentUser(user_id="dev-user")
 
@@ -28,17 +30,12 @@ async def get_current_user(
         )
 
     token = credentials.credentials
-    logger.info("auth_attempt", extra={"token_prefix": token[:30] if token else None})
     try:
         claims = verify_jwt(token, settings.supabase_jwks_url)
     except AuthError as err:
         logger.warning(
             "auth_failed",
-            extra={
-                "reason": err.reason,
-                "token_prefix": token[:30] if token else None,
-                "jwks_url": settings.supabase_jwks_url,
-            },
+            extra={"reason": err.reason, "jwks_url": settings.supabase_jwks_url},
         )
         raise HTTPException(
             status_code=401,

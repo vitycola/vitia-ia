@@ -52,13 +52,21 @@ def create_app(allowed_origins: list[str] | None = None) -> FastAPI:
         lifespan=lifespan,
     )
 
+    _raw_regex = settings.allowed_origins_regex or None
+    if _raw_regex:
+        prefix = "" if _raw_regex.startswith("^") else "^"
+        suffix = "" if _raw_regex.endswith("$") else "$"
+        origin_regex: str | None = prefix + _raw_regex + suffix
+    else:
+        origin_regex = None
+
     application.add_middleware(
         CORSMiddleware,
         allow_origins=origins,
-        allow_origin_regex=settings.allowed_origins_regex or None,
+        allow_origin_regex=origin_regex,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["POST", "GET", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type"],
     )
 
     application.include_router(health.router)

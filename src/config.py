@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     supabase_url: str = ""
     supabase_anon_key: SecretStr = SecretStr("")
 
+    environment: str = "development"
+
     # Dev only — disables JWT auth entirely. NEVER set in production.
     auth_disabled: bool = False
 
