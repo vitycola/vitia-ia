@@ -17,8 +17,11 @@ async def get_current_user(
     settings: Settings = Depends(get_settings),  # noqa: B008
 ) -> CurrentUser:
     if settings.auth_disabled:
-        if settings.environment == "production":
-            raise RuntimeError("AUTH_DISABLED cannot be set in production environment")
+        if settings.environment != "development":
+            raise RuntimeError(
+                "AUTH_DISABLED can only be set in development environment, "
+                f"current: {settings.environment!r}"
+            )
         logger.warning("auth_disabled — skipping JWT validation (dev only)")
         return CurrentUser(user_id="dev-user")
 
