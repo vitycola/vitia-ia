@@ -29,7 +29,10 @@ async def get_current_user(
             settings.supabase_jwks_url,
         )
     except AuthError as err:
-        logger.warning("auth_failed", extra={"reason": err.reason, "jwks_url": settings.supabase_jwks_url})
+        logger.warning(
+            "auth_failed",
+            extra={"reason": err.reason, "jwks_url": settings.supabase_jwks_url},
+        )
         raise HTTPException(
             status_code=401,
             detail=f"Auth failed: {err.reason}",
