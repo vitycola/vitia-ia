@@ -16,6 +16,15 @@ async def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),  # noqa: B008
     settings: Settings = Depends(get_settings),  # noqa: B008
 ) -> CurrentUser:
+    if settings.auth_disabled:
+        if settings.environment != "development":
+            raise RuntimeError(
+                "AUTH_DISABLED can only be set in development environment, "
+                f"current: {settings.environment!r}"
+            )
+        logger.warning("auth_disabled — skipping JWT validation (dev only)")
+        return CurrentUser(user_id="dev-user")
+
     if credentials is None:
         raise HTTPException(
             status_code=401,
@@ -23,19 +32,22 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    token = credentials.credentials
     try:
-        claims = verify_jwt(
-            credentials.credentials,
-            settings.supabase_jwks_url,
-        )
+        claims = verify_jwt(token, settings.supabase_jwks_url)
     except AuthError as err:
         logger.warning(
             "auth_failed",
             extra={"reason": err.reason, "jwks_url": settings.supabase_jwks_url},
         )
+        detail = (
+            f"Auth failed: {err.reason}"
+            if settings.environment != "production"
+            else "Could not validate credentials"
+        )
         raise HTTPException(
             status_code=401,
-            detail=f"Auth failed: {err.reason}",
+            detail=detail,
             headers={"WWW-Authenticate": "Bearer"},
         ) from err
 
