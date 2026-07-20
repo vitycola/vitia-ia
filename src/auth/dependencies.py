@@ -23,19 +23,22 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    token = credentials.credentials
+    logger.info("auth_attempt", extra={"token_prefix": token[:30] if token else None})
     try:
-        claims = verify_jwt(
-            credentials.credentials,
-            settings.supabase_jwks_url,
-        )
+        claims = verify_jwt(token, settings.supabase_jwks_url)
     except AuthError as err:
         logger.warning(
             "auth_failed",
-            extra={"reason": err.reason, "jwks_url": settings.supabase_jwks_url},
+            extra={
+                "reason": err.reason,
+                "token_prefix": token[:30] if token else None,
+                "jwks_url": settings.supabase_jwks_url,
+            },
         )
         raise HTTPException(
             status_code=401,
-            detail=f"Auth failed: {err.reason}",
+            detail="Could not validate credentials",
             headers={"WWW-Authenticate": "Bearer"},
         ) from err
 
