@@ -146,7 +146,7 @@ async def test_both_miss_unmatched() -> None:
 
 @pytest.mark.asyncio
 async def test_degraded_on_infra_error() -> None:
-    """Infra error on one item → that item becomes unmatched; degraded=True; other items unaffected."""
+    """Infra error on one item: becomes unmatched; degraded=True; other items unaffected."""
     repo = MagicMock()
     repo.search = AsyncMock(side_effect=Exception("network error"))
     off_client = MagicMock()

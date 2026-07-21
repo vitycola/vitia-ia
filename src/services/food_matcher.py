@@ -58,7 +58,7 @@ class FoodMatcherService:
         )
         items: list[MatchedFood] = []
         has_error = False
-        for food, result in zip(foods.items, raw):
+        for food, result in zip(foods.items, raw, strict=True):
             if isinstance(result, BaseException):
                 has_error = True
                 items.append(
