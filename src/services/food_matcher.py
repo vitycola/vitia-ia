@@ -127,7 +127,20 @@ class FoodMatcherService:
                 low_confidence=False,
             )
 
-        # Unmatched
+        # LLM estimate fallback — use macros the model provided at identification time
+        if food.estimated_macros_per_100g is not None:
+            return MatchedFood(
+                query_name=food.name,
+                grams=food.estimated_grams,
+                source="llm_estimate",
+                matched_name=None,
+                score=None,
+                macros_per_100g=food.estimated_macros_per_100g,
+                macros_actual=_compute_actuals(food.estimated_macros_per_100g, food.estimated_grams),
+                low_confidence=True,
+            )
+
+        # Unmatched — no data from any source
         return MatchedFood(
             query_name=food.name,
             grams=food.estimated_grams,

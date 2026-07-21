@@ -3,21 +3,22 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 
-class IdentifiedFood(BaseModel):
-    name: str = Field(min_length=1)
-    estimated_grams: float = Field(gt=0)
-    confidence: float = Field(ge=0.0, le=1.0)
-
-
-class IdentifiedFoods(BaseModel):
-    items: list[IdentifiedFood] = Field(default_factory=list)
-
-
 class MacrosPer100g(BaseModel):
     calories: float = Field(ge=0.0)
     protein: float = Field(ge=0.0)
     carbs: float = Field(ge=0.0)
     fat: float = Field(ge=0.0)
+
+
+class IdentifiedFood(BaseModel):
+    name: str = Field(min_length=1)
+    estimated_grams: float = Field(gt=0)
+    confidence: float = Field(ge=0.0, le=1.0)
+    estimated_macros_per_100g: MacrosPer100g | None = None
+
+
+class IdentifiedFoods(BaseModel):
+    items: list[IdentifiedFood] = Field(default_factory=list)
 
 
 class MacroTotals(BaseModel):
@@ -30,7 +31,7 @@ class MacroTotals(BaseModel):
 class MatchedFood(BaseModel):
     query_name: str
     grams: float
-    source: Literal["supabase", "open_food_facts", "unmatched"]
+    source: Literal["supabase", "open_food_facts", "llm_estimate", "unmatched"]
     matched_name: str | None = None
     score: float | None = None
     macros_per_100g: MacrosPer100g | None = None
