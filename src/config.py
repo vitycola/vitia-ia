@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     # LLM settings
     llm_provider: str = "anthropic"
     anthropic_api_key: SecretStr | None = None
-    anthropic_model: str = "claude-opus-4-8"
+    anthropic_model: str = "claude-sonnet-5"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
