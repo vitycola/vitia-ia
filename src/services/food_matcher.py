@@ -52,24 +52,31 @@ class FoodMatcherService:
         self._off = off_client
 
     async def match_all(self, foods: IdentifiedFoods) -> MatchResult:
-        try:
-            results = await asyncio.gather(
-                *[self._match_one(food) for food in foods.items],
-                return_exceptions=True,
-            )
-            # If any coroutine raised, treat the whole batch as degraded.
-            for result in results:
-                if isinstance(result, BaseException):
-                    raise result
-            items: list[MatchedFood] = list(results)  # type: ignore[arg-type]
-        except Exception:
-            return MatchResult(
-                items=[],
-                totals=MacroTotals(),
-                degraded=True,
-            )
+        raw = await asyncio.gather(
+            *[self._match_one(food) for food in foods.items],
+            return_exceptions=True,
+        )
+        items: list[MatchedFood] = []
+        has_error = False
+        for food, result in zip(foods.items, raw):
+            if isinstance(result, BaseException):
+                has_error = True
+                items.append(
+                    MatchedFood(
+                        query_name=food.name,
+                        grams=food.estimated_grams,
+                        source="unmatched",
+                        matched_name=None,
+                        score=None,
+                        macros_per_100g=None,
+                        macros_actual=MacroTotals(),
+                        low_confidence=True,
+                    )
+                )
+            else:
+                items.append(result)
 
-        return MatchResult(items=items, totals=_sum_totals(items), degraded=False)
+        return MatchResult(items=items, totals=_sum_totals(items), degraded=has_error)
 
     async def _match_one(self, food: IdentifiedFood) -> MatchedFood:
         norm = normalize(food.name)
@@ -103,8 +110,11 @@ class FoodMatcherService:
                         low_confidence=False,
                     )
 
-        # OFF fallback
-        off_macros = await self._off.search(food.name)
+        # OFF fallback — treat HTTP errors as a miss, not a fatal exception
+        try:
+            off_macros = await self._off.search(food.name)
+        except Exception:
+            off_macros = None
         if off_macros is not None:
             return MatchedFood(
                 query_name=food.name,

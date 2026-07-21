@@ -146,6 +146,7 @@ async def test_both_miss_unmatched() -> None:
 
 @pytest.mark.asyncio
 async def test_degraded_on_infra_error() -> None:
+    """Infra error on one item → that item becomes unmatched; degraded=True; other items unaffected."""
     repo = MagicMock()
     repo.search = AsyncMock(side_effect=Exception("network error"))
     off_client = MagicMock()
@@ -155,7 +156,9 @@ async def test_degraded_on_infra_error() -> None:
     result = await service.match_all(_foods(("apple", 80.0)))
 
     assert result.degraded is True
-    assert result.items == []
+    assert len(result.items) == 1
+    assert result.items[0].source == "unmatched"
+    assert result.items[0].query_name == "apple"
     assert result.totals == MacroTotals()
 
 
