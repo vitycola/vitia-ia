@@ -1,18 +1,22 @@
 VISION_PROMPT = (
     "Identify every food item visible in this image. "
     "For each item, call the record_identified_foods tool with the following fields: "
-    "name (string — the food name), "
+    "name (string — the food name in English), "
     "estimated_grams (float greater than 0 — the estimated portion weight in grams), "
-    "confidence (float between 0.0 and 1.0 — how confident you are in the identification). "
+    "confidence (float between 0.0 and 1.0 — how confident you are in the identification), "
+    "estimated_macros_per_100g (object with calories, protein, carbs, fat as floats per 100 g "
+    "— your best nutritional estimate; use 0.0 only if truly unknown). "
     "If no food items are present, call the tool with an empty items list."
 )
 
 TEXT_PROMPT = (
     "Identify every food item described in the text below. "
     "For each item, call the record_identified_foods tool with the following fields: "
-    "name (string — the food name), "
+    "name (string — the food name in English), "
     "estimated_grams (float greater than 0 — the estimated portion weight in grams), "
-    "confidence (float between 0.0 and 1.0 — how confident you are in the identification). "
+    "confidence (float between 0.0 and 1.0 — how confident you are in the identification), "
+    "estimated_macros_per_100g (object with calories, protein, carbs, fat as floats per 100 g "
+    "— your best nutritional estimate; use 0.0 only if truly unknown). "
     "If no food items are described, call the tool with an empty items list.\n\n"
     "Quantity interpretation rules:\n"
     "- Colloquial Spanish quantities: 'un cacho' or 'un trozo' ≈ 30 g, 'un puñado' ≈ 30 g, "
