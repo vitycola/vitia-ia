@@ -2,8 +2,11 @@ from functools import lru_cache
 
 import jwt
 from jwt import PyJWKClient
+from jwt.exceptions import PyJWKClientConnectionError, PyJWKClientError
 
 from src.config import get_settings
+
+JWKS_TIMEOUT = 5  # seconds
 
 
 class AuthError(Exception):
@@ -15,7 +18,7 @@ class AuthError(Exception):
 @lru_cache(maxsize=1)
 def _get_jwks_client(jwks_url: str) -> PyJWKClient:
     """Return a cached PyJWKClient instance for the given JWKS URL."""
-    return PyJWKClient(jwks_url)
+    return PyJWKClient(jwks_url, timeout=JWKS_TIMEOUT, cache_keys=True)
 
 
 def verify_jwt(token: str, jwks_url: str) -> dict:
@@ -43,7 +46,11 @@ def verify_jwt(token: str, jwks_url: str) -> dict:
         raise AuthError(reason="invalid_issuer") from err
     except jwt.DecodeError as err:
         raise AuthError(reason="decode_error") from err
+    except PyJWKClientConnectionError as err:
+        raise AuthError(reason="jwks_unreachable") from err
+    except PyJWKClientError as err:
+        raise AuthError(reason=f"jwks_error:{type(err).__name__}") from err
     except (jwt.InvalidTokenError, jwt.PyJWTError) as err:
         raise AuthError(reason=f"invalid_token:{type(err).__name__}") from err
     except Exception as err:
-        raise AuthError(reason=f"jwks_error:{type(err).__name__}") from err
+        raise AuthError(reason=f"unexpected:{type(err).__name__}") from err
