@@ -1,5 +1,6 @@
 """Tests for TextParsingService."""
 
+from typing import cast
 from unittest.mock import AsyncMock
 
 import pytest
@@ -241,7 +242,8 @@ async def test_parse_forwards_correlation_id_and_degraded_reason():
 
     result = await service.parse("arroz", "corr-cid")
 
-    service.matcher.match_all.assert_awaited_once_with(llm_result, correlation_id="corr-cid")
+    match_all = cast(AsyncMock, service.matcher.match_all)
+    match_all.assert_awaited_once_with(llm_result, correlation_id="corr-cid")
     assert result.degraded_reason == "repo_error"
 
 
