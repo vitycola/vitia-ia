@@ -1,3 +1,11 @@
+_NAMING_RULES = (
+    "\n\nNaming rules (Spanish/English false friends):\n"
+    "- Resolve false friends by the food's real meaning, not by lookalike words. "
+    "For example, 'bacon' means 'beicon' or 'panceta ahumada' (smoked pork), "
+    "never another food; 'pan' is bread, not a pan (cookware).\n"
+    "- Always output the final name in Spanish (castellano)."
+)
+
 VISION_PROMPT = (
     "Identify every food item visible in this image. "
     "For each item, call the record_identified_foods tool with the following fields: "
@@ -6,7 +14,7 @@ VISION_PROMPT = (
     "confidence (float between 0.0 and 1.0 — how confident you are in the identification), "
     "estimated_macros_per_100g (object with calories, protein, carbs, fat as floats per 100 g "
     "— your best nutritional estimate; use 0.0 only if truly unknown). "
-    "If no food items are present, call the tool with an empty items list."
+    "If no food items are present, call the tool with an empty items list." + _NAMING_RULES
 )
 
 TEXT_PROMPT = (
@@ -30,5 +38,5 @@ TEXT_PROMPT = (
     "- Split compound descriptions into individual food items. "
     "For example, 'arroz con pollo y ensalada' → three separate items: arroz, pollo, ensalada. "
     "'Tostadas con mantequilla y mermelada' → tostadas, mantequilla, mermelada.\n"
-    "- Assign a reasonable portion weight to each component independently."
+    "- Assign a reasonable portion weight to each component independently." + _NAMING_RULES
 )

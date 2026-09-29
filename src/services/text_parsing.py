@@ -62,9 +62,11 @@ class TextParsingService:
 
         t0 = time.monotonic()
         logger.info("parse_text_matcher_start", extra={"correlation_id": correlation_id})
-        raw_result = await self.matcher.match_all(foods)
+        raw_result = await self.matcher.match_all(foods, correlation_id=correlation_id)
         if not foods.items:
             raw_result.degraded = True
+            if raw_result.degraded_reason is None:
+                raw_result.degraded_reason = "no_foods_identified"
 
         matched = [i for i in raw_result.items if i.source != "unmatched"]
         unmatched = [i for i in raw_result.items if i.source == "unmatched"]
@@ -80,13 +82,14 @@ class TextParsingService:
             },
         )
 
-        skipped = [f.query_name for f in unmatched]
+        skipped = raw_result.skipped
         totals = _sum_totals(matched)
 
         result = MatchResult(
             items=matched,
             totals=totals,
             degraded=raw_result.degraded,
+            degraded_reason=raw_result.degraded_reason,
             skipped=skipped,
         )
 
