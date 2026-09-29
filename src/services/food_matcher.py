@@ -70,6 +70,8 @@ class FoodMatcherService:
         item_failed = False
         for food, result in zip(foods.items, raw, strict=True):
             if isinstance(result, BaseException):
+                if not isinstance(result, Exception):
+                    raise result
                 item_failed = True
                 logger.error(
                     "matcher_item_error",
@@ -112,7 +114,17 @@ class FoodMatcherService:
         """Attach advisory review flags. A failure here must never affect the item."""
         try:
             reasons = review_reasons(item, food)
-        except Exception:
+        except Exception as e:
+            logger.warning(
+                "matcher_review_error",
+                extra={
+                    "correlation_id": correlation_id,
+                    "stage": "review",
+                    "error_type": type(e).__name__,
+                    "error_message": str(e),
+                    "food_name": food.name,
+                },
+            )
             return
         if not reasons:
             return
@@ -148,7 +160,33 @@ class FoodMatcherService:
                     "food_name": food.name,
                 },
             )
-        return await self._resolve(food, candidates, correlation_id), repo_failed
+        try:
+            return await self._resolve(food, candidates, correlation_id), repo_failed
+        except Exception as e:
+            if not repo_failed:
+                raise
+            # Keep repo_error precedence: the repo already failed for this item.
+            logger.error(
+                "matcher_item_error",
+                exc_info=True,
+                extra={
+                    "correlation_id": correlation_id,
+                    "stage": "match",
+                    "error_type": type(e).__name__,
+                    "error_message": str(e),
+                    "food_name": food.name,
+                },
+            )
+            return (
+                MatchedFood(
+                    query_name=food.name,
+                    grams=food.estimated_grams,
+                    source="unmatched",
+                    macros_actual=MacroTotals(),
+                    low_confidence=True,
+                ),
+                True,
+            )
 
     async def _resolve(
         self, food: IdentifiedFood, candidates: list[dict], correlation_id: str | None

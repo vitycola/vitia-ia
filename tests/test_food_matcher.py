@@ -422,3 +422,43 @@ def test_off_neither_energy_field_zero() -> None:
     result = OFFFallbackClient._extract_macros(product)
     assert result is not None
     assert result.calories == pytest.approx(0.0)
+
+
+@pytest.mark.asyncio
+async def test_resolve_failure_after_repo_failure_keeps_repo_error() -> None:
+    service = _failing_repo_service()
+    service._resolve = AsyncMock(side_effect=ValueError("resolve blew up"))  # type: ignore[method-assign]
+
+    with patch("src.services.food_matcher.logger") as mock_logger:
+        result = await service.match_all(_foods(("apple", 80.0)))
+
+    assert result.degraded_reason == "repo_error"
+    assert result.items[0].source == "unmatched"
+    assert result.skipped == ["apple"]
+    assert mock_logger.error.call_args.args[0] == "matcher_item_error"
+
+
+@pytest.mark.asyncio
+async def test_non_exception_base_errors_are_reraised() -> None:
+    import asyncio
+
+    service = _make_service([], off_result=None)
+    service._match_one = AsyncMock(side_effect=asyncio.CancelledError())  # type: ignore[method-assign]
+
+    with pytest.raises(asyncio.CancelledError):
+        await service.match_all(_foods(("apple", 80.0)))
+
+
+@pytest.mark.asyncio
+async def test_review_failure_is_logged() -> None:
+    off_macros = MacrosPer100g(calories=250.0, protein=8.0, carbs=50.0, fat=3.0)
+    service = _make_service([], off_result=off_macros)
+
+    with (
+        patch("src.services.food_matcher.review_reasons", side_effect=RuntimeError("boom")),
+        patch("src.services.food_matcher.logger") as mock_logger,
+    ):
+        await service.match_all(_foods(("bread", 300.0)), correlation_id="c1")
+
+    assert mock_logger.warning.call_args.args[0] == "matcher_review_error"
+    assert mock_logger.warning.call_args.kwargs["extra"]["correlation_id"] == "c1"
