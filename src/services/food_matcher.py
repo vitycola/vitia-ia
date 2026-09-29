@@ -136,7 +136,9 @@ class FoodMatcherService:
                 matched_name=None,
                 score=None,
                 macros_per_100g=food.estimated_macros_per_100g,
-                macros_actual=_compute_actuals(food.estimated_macros_per_100g, food.estimated_grams),
+                macros_actual=_compute_actuals(
+                    food.estimated_macros_per_100g, food.estimated_grams
+                ),
                 low_confidence=True,
             )
 
