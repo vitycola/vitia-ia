@@ -55,6 +55,52 @@ def test_settings_raises_when_supabase_jwks_url_missing(monkeypatch: pytest.Monk
 
 
 # ---------------------------------------------------------------------------
+# SUPABASE_URL validation (R6)
+# ---------------------------------------------------------------------------
+
+
+def _build_settings(monkeypatch: pytest.MonkeyPatch, url: str, **env: str):
+    from src.config import Settings, get_settings
+
+    monkeypatch.setenv("SUPABASE_URL", url)
+    monkeypatch.setenv("SUPABASE_ANON_KEY", "some-key")
+    monkeypatch.setenv("SUPABASE_JWKS_URL", "https://x.supabase.co/auth/v1/.well-known/jwks.json")
+    for key, value in env.items():
+        monkeypatch.setenv(key, value)
+    get_settings.cache_clear()
+    try:
+        return Settings()
+    finally:
+        get_settings.cache_clear()
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://<project-id>.supabase.co",
+        "ftp://x",
+        "https://",
+        "http:///path",
+        "https://ab c.supabase.co",
+        "https://{project}.supabase.co",
+    ],
+)
+def test_settings_rejects_invalid_supabase_url(monkeypatch: pytest.MonkeyPatch, url: str) -> None:
+    with pytest.raises(Exception, match="SUPABASE_URL is invalid or a placeholder"):
+        _build_settings(monkeypatch, url)
+
+
+@pytest.mark.parametrize("url", ["https://abc.supabase.co", "https://db.example.com"])
+def test_settings_accepts_valid_supabase_url(monkeypatch: pytest.MonkeyPatch, url: str) -> None:
+    assert _build_settings(monkeypatch, url).supabase_url == url
+
+
+def test_supabase_url_not_validated_when_auth_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = _build_settings(monkeypatch, "<placeholder>", AUTH_DISABLED="true")
+    assert settings.supabase_url == "<placeholder>"
+
+
+# ---------------------------------------------------------------------------
 # JWT aud/iss verification (T03)
 # ---------------------------------------------------------------------------
 

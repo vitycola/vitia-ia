@@ -1,9 +1,27 @@
 from functools import lru_cache
+from urllib.parse import urlparse
 
 from pydantic import SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 MAX_IMAGE_BYTES = 4 * 1024 * 1024  # 4 MiB
+
+
+_URL_FORBIDDEN_CHARS = frozenset("<>{}")
+
+
+def _validate_supabase_url(url: str) -> None:
+    """Reject placeholder-style or non-http(s) URLs; custom domains are allowed."""
+    message = "SUPABASE_URL is invalid or a placeholder: must be http(s)://<host>."
+    if any(ch in _URL_FORBIDDEN_CHARS or ch.isspace() for ch in url):
+        raise ValueError(message)
+    try:
+        parsed = urlparse(url)
+        host = parsed.hostname
+    except ValueError:
+        raise ValueError(message) from None
+    if parsed.scheme not in ("http", "https") or not host:
+        raise ValueError(message)
 
 
 class Settings(BaseSettings):
@@ -35,6 +53,7 @@ class Settings(BaseSettings):
             return self
         if not self.supabase_url:
             raise ValueError("SUPABASE_URL is required but not set.")
+        _validate_supabase_url(self.supabase_url)
         if not self.supabase_anon_key.get_secret_value():
             raise ValueError("SUPABASE_ANON_KEY is required but not set.")
         if not self.supabase_jwks_url:
