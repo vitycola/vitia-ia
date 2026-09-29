@@ -5,7 +5,13 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from src.domain.food import IdentifiedFoods, MacroTotals, MatchResult
+from src.domain.food import (
+    IdentifiedFood,
+    IdentifiedFoods,
+    MacroTotals,
+    MatchedFood,
+    MatchResult,
+)
 from src.services.photo_analysis import LLMError, LLMTimeoutError, PhotoAnalysisService
 from src.utils.image import TranscodeError
 
@@ -127,3 +133,57 @@ async def test_analyze_empty_foods_returns_degraded_result():
     )
     assert result.degraded is True
     assert result.items == []
+
+
+@pytest.mark.asyncio
+async def test_analyze_forwards_correlation_id_to_matcher():
+    foods = IdentifiedFoods(items=[])
+    llm = AsyncMock()
+    llm.analyze_image = AsyncMock(return_value=foods)
+    service = _make_service(llm=llm)
+    await service.analyze(FAKE_JPEG, "image/jpeg", None, "cid-42")
+    cast(AsyncMock, service.matcher.match_all).assert_awaited_once_with(
+        foods, correlation_id="cid-42"
+    )
+
+
+@pytest.mark.asyncio
+async def test_analyze_skipped_passes_through_and_keeps_unmatched_items():
+    unmatched = MatchedFood(
+        query_name="unicornio", grams=50.0, source="unmatched", macros_actual=MacroTotals()
+    )
+    matcher = AsyncMock()
+    matcher.match_all = AsyncMock(
+        return_value=MatchResult(items=[unmatched], totals=MacroTotals(), skipped=["unicornio"])
+    )
+    llm = AsyncMock()
+    llm.analyze_image = AsyncMock(
+        return_value=IdentifiedFoods(
+            items=[IdentifiedFood(name="unicornio", estimated_grams=50.0, confidence=0.5)]
+        )
+    )
+    service = _make_service(llm=llm, matcher=matcher)
+    result = await service.analyze(FAKE_JPEG, "image/jpeg", None, "cid")
+    assert result.skipped == ["unicornio"]
+    assert [i.query_name for i in result.items] == ["unicornio"]
+
+
+@pytest.mark.asyncio
+async def test_analyze_empty_foods_sets_no_foods_identified_reason():
+    service = _make_service()
+    result = await service.analyze(FAKE_JPEG, "image/jpeg", None, "cid")
+    assert result.degraded is True
+    assert result.degraded_reason == "no_foods_identified"
+
+
+@pytest.mark.asyncio
+async def test_analyze_empty_foods_keeps_existing_degraded_reason():
+    matcher = AsyncMock()
+    matcher.match_all = AsyncMock(
+        return_value=MatchResult(
+            items=[], totals=MacroTotals(), degraded=True, degraded_reason="repo_error"
+        )
+    )
+    service = _make_service(matcher=matcher)
+    result = await service.analyze(FAKE_JPEG, "image/jpeg", None, "cid")
+    assert result.degraded_reason == "repo_error"

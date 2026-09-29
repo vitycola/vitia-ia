@@ -140,6 +140,7 @@ async def test_parse_partial_match_populates_skipped():
         items=[matched, unmatched],
         totals=MacroTotals(calories=200.0, protein=5.0, carbs=10.0, fat=2.0),
         degraded=False,
+        skipped=["unicornio"],
     )
     service = _make_service(llm_result=llm_result, matcher_result=matcher_result)
 
@@ -165,6 +166,7 @@ async def test_parse_all_unmatched_empty_items_populated_skipped():
         items=[u1, u2],
         totals=MacroTotals(),
         degraded=False,
+        skipped=["xyzfood", "blargh"],
     )
     service = _make_service(llm_result=llm_result, matcher_result=matcher_result)
 
@@ -221,3 +223,47 @@ async def test_parse_llm_error_raises():
 
     with pytest.raises(LLMError):
         await service.parse("some food", "corr-9")
+
+
+@pytest.mark.asyncio
+async def test_parse_forwards_correlation_id_and_degraded_reason():
+    food_item = _matched_food("arroz", source="supabase", calories=150.0)
+    llm_result = IdentifiedFoods(
+        items=[IdentifiedFood(name="arroz", estimated_grams=100.0, confidence=0.9)]
+    )
+    matcher_result = MatchResult(
+        items=[food_item],
+        totals=MacroTotals(calories=150.0),
+        degraded=True,
+        degraded_reason="repo_error",
+    )
+    service = _make_service(llm_result=llm_result, matcher_result=matcher_result)
+
+    result = await service.parse("arroz", "corr-cid")
+
+    service.matcher.match_all.assert_awaited_once_with(llm_result, correlation_id="corr-cid")
+    assert result.degraded_reason == "repo_error"
+
+
+@pytest.mark.asyncio
+async def test_parse_empty_foods_sets_no_foods_identified_reason():
+    service = _make_service(llm_result=IdentifiedFoods(items=[]))
+
+    result = await service.parse("nothing", "corr-8")
+
+    assert result.degraded is True
+    assert result.degraded_reason == "no_foods_identified"
+
+
+@pytest.mark.asyncio
+async def test_parse_empty_foods_keeps_existing_degraded_reason():
+    service = _make_service(
+        llm_result=IdentifiedFoods(items=[]),
+        matcher_result=MatchResult(
+            items=[], totals=MacroTotals(), degraded=True, degraded_reason="repo_error"
+        ),
+    )
+
+    result = await service.parse("nothing", "corr-9")
+
+    assert result.degraded_reason == "repo_error"

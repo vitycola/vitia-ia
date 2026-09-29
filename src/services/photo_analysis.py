@@ -80,9 +80,11 @@ class PhotoAnalysisService:
 
         t0 = time.monotonic()
         logger.info("matcher_start", extra={"correlation_id": correlation_id})
-        result = await self.matcher.match_all(foods)
+        result = await self.matcher.match_all(foods, correlation_id=correlation_id)
         if not foods.items:
             result.degraded = True
+            if result.degraded_reason is None:
+                result.degraded_reason = "no_foods_identified"
         matched = sum(1 for i in result.items if i.source != "unmatched")
         unmatched = sum(1 for i in result.items if i.source == "unmatched")
         logger.info(
