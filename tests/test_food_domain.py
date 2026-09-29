@@ -58,3 +58,16 @@ def test_match_result_shape() -> None:
     )
     assert result.degraded is False
     assert result.items == []
+
+
+def test_matched_food_review_defaults_not_shared() -> None:
+    a = MatchedFood(query_name="a", grams=1.0, source="unmatched", macros_actual=MacroTotals())
+    b = MatchedFood(query_name="b", grams=1.0, source="unmatched", macros_actual=MacroTotals())
+    assert a.review is False
+    assert a.review_reasons == []
+    a.review_reasons.append("x")
+    assert b.review_reasons == []
+
+
+def test_match_result_degraded_reason_default_none() -> None:
+    assert MatchResult(totals=MacroTotals()).degraded_reason is None

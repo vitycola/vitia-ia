@@ -37,10 +37,13 @@ class MatchedFood(BaseModel):
     macros_per_100g: MacrosPer100g | None = None
     macros_actual: MacroTotals
     low_confidence: bool = False
+    review: bool = False
+    review_reasons: list[str] = Field(default_factory=list)
 
 
 class MatchResult(BaseModel):
     items: list[MatchedFood] = Field(default_factory=list)
     totals: MacroTotals
     degraded: bool = False
+    degraded_reason: str | None = None
     skipped: list[str] = Field(default_factory=list)
