@@ -1,7 +1,7 @@
 VISION_PROMPT = (
     "Identify every food item visible in this image. "
     "For each item, call the record_identified_foods tool with the following fields: "
-    "name (string — the food name in English), "
+    "name (string — the food name in Spanish (castellano)), "
     "estimated_grams (float greater than 0 — the estimated portion weight in grams), "
     "confidence (float between 0.0 and 1.0 — how confident you are in the identification), "
     "estimated_macros_per_100g (object with calories, protein, carbs, fat as floats per 100 g "
@@ -12,7 +12,7 @@ VISION_PROMPT = (
 TEXT_PROMPT = (
     "Identify every food item described in the text below. "
     "For each item, call the record_identified_foods tool with the following fields: "
-    "name (string — the food name in English), "
+    "name (string — the food name in Spanish (castellano)), "
     "estimated_grams (float greater than 0 — the estimated portion weight in grams), "
     "confidence (float between 0.0 and 1.0 — how confident you are in the identification), "
     "estimated_macros_per_100g (object with calories, protein, carbs, fat as floats per 100 g "
