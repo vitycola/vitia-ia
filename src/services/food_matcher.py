@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import unicodedata
 
 from rapidfuzz import fuzz, process
@@ -13,6 +14,12 @@ from src.domain.food import (
     MatchedFood,
     MatchResult,
 )
+from src.services.match_review import review_reasons
+
+logger = logging.getLogger("vitia.match")
+
+REPO_ERROR = "repo_error"
+MATCH_ERROR = "match_error"
 
 # Configurable threshold for fuzzy matching against Supabase candidates.
 # Scores are 0–100; values below this fall through to OFF or unmatched.
@@ -51,36 +58,102 @@ class FoodMatcherService:
         self._repo = repo
         self._off = off_client
 
-    async def match_all(self, foods: IdentifiedFoods) -> MatchResult:
+    async def match_all(
+        self, foods: IdentifiedFoods, correlation_id: str | None = None
+    ) -> MatchResult:
         raw = await asyncio.gather(
-            *[self._match_one(food) for food in foods.items],
+            *[self._match_one(food, correlation_id) for food in foods.items],
             return_exceptions=True,
         )
         items: list[MatchedFood] = []
-        has_error = False
+        repo_failed = False
+        item_failed = False
         for food, result in zip(foods.items, raw, strict=True):
             if isinstance(result, BaseException):
-                has_error = True
-                items.append(
-                    MatchedFood(
-                        query_name=food.name,
-                        grams=food.estimated_grams,
-                        source="unmatched",
-                        matched_name=None,
-                        score=None,
-                        macros_per_100g=None,
-                        macros_actual=MacroTotals(),
-                        low_confidence=True,
-                    )
+                item_failed = True
+                logger.error(
+                    "matcher_item_error",
+                    exc_info=result,
+                    extra={
+                        "correlation_id": correlation_id,
+                        "stage": "match",
+                        "error_type": type(result).__name__,
+                        "error_message": str(result),
+                        "food_name": food.name,
+                    },
+                )
+                item = MatchedFood(
+                    query_name=food.name,
+                    grams=food.estimated_grams,
+                    source="unmatched",
+                    matched_name=None,
+                    score=None,
+                    macros_per_100g=None,
+                    macros_actual=MacroTotals(),
+                    low_confidence=True,
                 )
             else:
-                items.append(result)
+                item, item_repo_failed = result
+                repo_failed = repo_failed or item_repo_failed
+            self._apply_review(item, food, correlation_id)
+            items.append(item)
 
-        return MatchResult(items=items, totals=_sum_totals(items), degraded=has_error)
+        degraded_reason = REPO_ERROR if repo_failed else MATCH_ERROR if item_failed else None
+        return MatchResult(
+            items=items,
+            totals=_sum_totals(items),
+            degraded=degraded_reason is not None,
+            degraded_reason=degraded_reason,
+            skipped=[i.query_name for i in items if i.source == "unmatched"],
+        )
 
-    async def _match_one(self, food: IdentifiedFood) -> MatchedFood:
+    @staticmethod
+    def _apply_review(item: MatchedFood, food: IdentifiedFood, correlation_id: str | None) -> None:
+        """Attach advisory review flags. A failure here must never affect the item."""
+        try:
+            reasons = review_reasons(item, food)
+        except Exception:
+            return
+        if not reasons:
+            return
+        item.review_reasons = reasons
+        item.review = True
+        logger.info(
+            "matcher_review_flagged",
+            extra={
+                "correlation_id": correlation_id,
+                "food_name": food.name,
+                "reasons": reasons,
+            },
+        )
+
+    async def _match_one(
+        self, food: IdentifiedFood, correlation_id: str | None = None
+    ) -> tuple[MatchedFood, bool]:
+        """Return (item, repo_failed)."""
+        repo_failed = False
+        candidates: list[dict] = []
+        try:
+            candidates = await self._repo.search(normalize(food.name))
+        except Exception as e:
+            repo_failed = True
+            logger.warning(
+                "matcher_repo_error",
+                exc_info=True,
+                extra={
+                    "correlation_id": correlation_id,
+                    "stage": "supabase",
+                    "error_type": type(e).__name__,
+                    "error_message": str(e),
+                    "food_name": food.name,
+                },
+            )
+        return await self._resolve(food, candidates, correlation_id), repo_failed
+
+    async def _resolve(
+        self, food: IdentifiedFood, candidates: list[dict], correlation_id: str | None
+    ) -> MatchedFood:
         norm = normalize(food.name)
-        candidates = await self._repo.search(norm)
 
         if candidates:
             names = [c["name"] for c in candidates]
@@ -113,8 +186,19 @@ class FoodMatcherService:
         # OFF fallback — treat HTTP errors as a miss, not a fatal exception
         try:
             off_macros = await self._off.search(food.name)
-        except Exception:
+        except Exception as e:
             off_macros = None
+            logger.warning(
+                "matcher_off_error",
+                exc_info=True,
+                extra={
+                    "correlation_id": correlation_id,
+                    "stage": "off",
+                    "error_type": type(e).__name__,
+                    "error_message": str(e),
+                    "food_name": food.name,
+                },
+            )
         if off_macros is not None:
             return MatchedFood(
                 query_name=food.name,

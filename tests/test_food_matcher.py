@@ -1,7 +1,7 @@
 """Unit tests for FoodMatcherService."""
 
 import inspect
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -144,22 +144,198 @@ async def test_both_miss_unmatched() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
-async def test_degraded_on_infra_error() -> None:
-    """Infra error on one item: becomes unmatched; degraded=True; other items unaffected."""
+def _failing_repo_service(
+    off_result: MacrosPer100g | None = None, off_error: Exception | None = None
+) -> FoodMatcherService:
     repo = MagicMock()
     repo.search = AsyncMock(side_effect=Exception("network error"))
     off_client = MagicMock()
-    off_client.search = AsyncMock(return_value=None)
-    service = FoodMatcherService(repo=repo, off_client=off_client)
+    if off_error is not None:
+        off_client.search = AsyncMock(side_effect=off_error)
+    else:
+        off_client.search = AsyncMock(return_value=off_result)
+    return FoodMatcherService(repo=repo, off_client=off_client)
+
+
+@pytest.mark.asyncio
+async def test_degraded_on_infra_error() -> None:
+    """Repo raises + OFF hit: item rescued by OFF, but result is degraded (repo_error)."""
+    off_macros = MacrosPer100g(calories=52.0, protein=0.3, carbs=14.0, fat=0.2)
+    service = _failing_repo_service(off_result=off_macros)
 
     result = await service.match_all(_foods(("apple", 80.0)))
 
     assert result.degraded is True
-    assert len(result.items) == 1
+    assert result.degraded_reason == "repo_error"
+    assert result.items[0].source == "open_food_facts"
+    assert result.skipped == []
+
+
+@pytest.mark.asyncio
+async def test_repo_error_falls_back_to_llm_estimate() -> None:
+    service = _failing_repo_service()
+    foods = IdentifiedFoods(
+        items=[
+            IdentifiedFood(
+                name="apple",
+                estimated_grams=100.0,
+                confidence=0.9,
+                estimated_macros_per_100g=MacrosPer100g(
+                    calories=52.0, protein=0.3, carbs=14.0, fat=0.2
+                ),
+            )
+        ]
+    )
+    result = await service.match_all(foods)
+
+    assert result.items[0].source == "llm_estimate"
+    assert result.degraded is True
+    assert result.degraded_reason == "repo_error"
+
+
+@pytest.mark.asyncio
+async def test_repo_error_all_miss_is_unmatched_and_skipped() -> None:
+    service = _failing_repo_service()
+
+    result = await service.match_all(_foods(("apple", 80.0)))
+
+    assert result.degraded is True
     assert result.items[0].source == "unmatched"
     assert result.items[0].query_name == "apple"
     assert result.totals == MacroTotals()
+    assert result.skipped == ["apple"]
+
+
+@pytest.mark.asyncio
+async def test_repo_error_is_logged_with_correlation_id_and_food_name() -> None:
+    service = _failing_repo_service()
+
+    with patch("src.services.food_matcher.logger") as mock_logger:
+        await service.match_all(_foods(("apple", 80.0)), correlation_id="abc")
+
+    mock_logger.warning.assert_called_once()
+    args, kwargs = mock_logger.warning.call_args
+    assert args[0] == "matcher_repo_error"
+    assert kwargs["extra"]["correlation_id"] == "abc"
+    assert kwargs["extra"]["food_name"] == "apple"
+    assert kwargs["exc_info"] is True
+
+
+@pytest.mark.asyncio
+async def test_repo_error_logged_without_correlation_id() -> None:
+    service = _failing_repo_service()
+
+    with patch("src.services.food_matcher.logger") as mock_logger:
+        result = await service.match_all(_foods(("apple", 80.0)))
+
+    mock_logger.warning.assert_called_once()
+    assert mock_logger.warning.call_args.kwargs["extra"]["correlation_id"] is None
+    assert result.degraded is True
+
+
+@pytest.mark.asyncio
+async def test_off_error_logged_flow_continues_not_degraded() -> None:
+    repo = MagicMock()
+    repo.search = AsyncMock(return_value=[])
+    off_client = MagicMock()
+    off_client.search = AsyncMock(side_effect=RuntimeError("off down"))
+    service = FoodMatcherService(repo=repo, off_client=off_client)
+    foods = IdentifiedFoods(
+        items=[
+            IdentifiedFood(
+                name="apple",
+                estimated_grams=100.0,
+                confidence=0.9,
+                estimated_macros_per_100g=MacrosPer100g(
+                    calories=52.0, protein=0.3, carbs=14.0, fat=0.2
+                ),
+            )
+        ]
+    )
+
+    with patch("src.services.food_matcher.logger") as mock_logger:
+        result = await service.match_all(foods, correlation_id="cid-1")
+
+    mock_logger.warning.assert_called_once()
+    args, kwargs = mock_logger.warning.call_args
+    assert args[0] == "matcher_off_error"
+    assert kwargs["extra"]["correlation_id"] == "cid-1"
+    assert kwargs["extra"]["food_name"] == "apple"
+    assert result.items[0].source == "llm_estimate"
+    assert result.degraded is False
+    assert result.degraded_reason is None
+
+
+@pytest.mark.asyncio
+async def test_unexpected_item_error_is_match_error_and_repo_error_wins() -> None:
+    service = _make_service([], off_result=None)
+    original = service._match_one
+
+    async def flaky(food, correlation_id=None):  # type: ignore[no-untyped-def]
+        if food.name == "boom":
+            raise ValueError("unexpected")
+        return await original(food, correlation_id)
+
+    service._match_one = flaky  # type: ignore[method-assign]
+
+    with patch("src.services.food_matcher.logger") as mock_logger:
+        result = await service.match_all(_foods(("boom", 50.0), ("ok", 50.0)))
+
+    mock_logger.error.assert_called_once()
+    assert mock_logger.error.call_args.args[0] == "matcher_item_error"
+    assert result.degraded is True
+    assert result.degraded_reason == "match_error"
+    assert result.skipped == ["boom", "ok"]
+
+    # repo_error takes precedence over match_error
+    repo_failing = _failing_repo_service()
+    orig2 = repo_failing._match_one
+
+    async def flaky2(food, correlation_id=None):  # type: ignore[no-untyped-def]
+        if food.name == "boom":
+            raise ValueError("unexpected")
+        return await orig2(food, correlation_id)
+
+    repo_failing._match_one = flaky2  # type: ignore[method-assign]
+    result2 = await repo_failing.match_all(_foods(("boom", 50.0), ("ok", 50.0)))
+    assert result2.degraded_reason == "repo_error"
+
+
+@pytest.mark.asyncio
+async def test_no_errors_not_degraded_and_skipped_populated() -> None:
+    service = _make_service([], off_result=None)
+
+    result = await service.match_all(_foods(("mystery", 50.0)))
+
+    assert result.degraded is False
+    assert result.degraded_reason is None
+    assert result.skipped == ["mystery"]
+
+
+@pytest.mark.asyncio
+async def test_high_portion_sets_review_flag() -> None:
+    off_macros = MacrosPer100g(calories=250.0, protein=8.0, carbs=50.0, fat=3.0)
+    service = _make_service([], off_result=off_macros)
+
+    result = await service.match_all(_foods(("bread", 300.0)))
+
+    item = result.items[0]
+    assert item.review is True
+    assert item.review_reasons == ["portion_high"]
+    assert item.macros_actual.calories == pytest.approx(750.0)
+
+
+@pytest.mark.asyncio
+async def test_review_failure_does_not_drop_item() -> None:
+    off_macros = MacrosPer100g(calories=250.0, protein=8.0, carbs=50.0, fat=3.0)
+    service = _make_service([], off_result=off_macros)
+
+    with patch("src.services.food_matcher.review_reasons", side_effect=RuntimeError("boom")):
+        result = await service.match_all(_foods(("bread", 300.0)))
+
+    assert len(result.items) == 1
+    assert result.items[0].review is False
+    assert result.items[0].macros_actual.calories == pytest.approx(750.0)
 
 
 # ---------------------------------------------------------------------------
