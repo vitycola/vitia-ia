@@ -13,6 +13,7 @@ from src.auth.dependencies import get_current_user
 from src.auth.models import CurrentUser
 from src.config import MAX_IMAGE_BYTES, get_settings
 from src.domain.food import MatchResult
+from src.domain.meal_context import normalize_meal_context
 from src.services.food_matcher import FoodMatcherService
 from src.services.photo_analysis import LLMError, LLMTimeoutError, PhotoAnalysisService
 from src.utils.image import TranscodeError, compress_to_limit
@@ -72,6 +73,7 @@ async def analyze_photo(
     correlation_id = str(uuid.uuid4())
 
     data = await image.read()
+    meal_context = normalize_meal_context(meal_context)
 
     logger.info(
         "analyze_request",
@@ -79,7 +81,7 @@ async def analyze_photo(
             "correlation_id": correlation_id,
             "declared_content_type": image.content_type,
             "size_bytes": len(data),
-            "has_meal_context": meal_context is not None,
+            "meal_context_length": len(meal_context or ""),
         },
     )
 

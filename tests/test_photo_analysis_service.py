@@ -1,5 +1,6 @@
 """Tests for PhotoAnalysisService."""
 
+import logging
 from typing import cast
 from unittest.mock import AsyncMock, patch
 
@@ -187,3 +188,38 @@ async def test_analyze_empty_foods_keeps_existing_degraded_reason():
     service = _make_service(matcher=matcher)
     result = await service.analyze(FAKE_JPEG, "image/jpeg", None, "cid")
     assert result.degraded_reason == "repo_error"
+
+
+@pytest.mark.asyncio
+async def test_analyze_passes_meal_context_to_llm_only():
+    service = _make_service()
+    await service.analyze(
+        image_bytes=FAKE_JPEG,
+        media_type="image/jpeg",
+        meal_context="200g rice",
+        correlation_id="test-id",
+    )
+
+    llm_call = cast(AsyncMock, service.llm.analyze_image).call_args
+    assert llm_call.kwargs["context"] == "200g rice"
+
+    match_call = cast(AsyncMock, service.matcher.match_all).call_args
+    assert "200g rice" not in repr(match_call)
+
+
+@pytest.mark.asyncio
+async def test_analyze_llm_failure_logs_do_not_contain_meal_context(caplog):
+    llm = AsyncMock()
+    llm.analyze_image = AsyncMock(side_effect=RuntimeError("network error"))
+    service = _make_service(llm=llm)
+
+    with caplog.at_level(logging.DEBUG), pytest.raises(LLMError):
+        await service.analyze(
+            image_bytes=FAKE_JPEG,
+            media_type="image/jpeg",
+            meal_context="200g rice",
+            correlation_id="test-id",
+        )
+
+    for record in caplog.records:
+        assert "200g rice" not in str(record.__dict__)

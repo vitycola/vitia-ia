@@ -1,10 +1,12 @@
 """Tests for POST /api/analyze route."""
 
+import logging
 import pathlib
 import struct
 import zlib
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from fastapi.testclient import TestClient
 
 from src.auth.dependencies import get_current_user
@@ -192,3 +194,66 @@ def test_analyze_requires_auth():
             files={"image": ("photo.jpg", _JPEG_BYTES, "image/jpeg")},
         )
     assert resp.status_code == 401
+
+
+def _post_with_context(svc, meal_context=None):
+    app = _make_app(svc)
+    data = {} if meal_context is None else {"meal_context": meal_context}
+    with patch("src.routes.analyze.sniff_mime", return_value="image/jpeg"):
+        with TestClient(app) as client:
+            return client.post(
+                "/api/analyze",
+                files={"image": ("photo.jpg", _JPEG_BYTES, "image/jpeg")},
+                data=data,
+            )
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("  200g rice  ", "200g rice"),
+        ("", None),
+        ("   \n\t ", None),
+        ("\x00\x07\x1b", None),
+        ("rice\x00 and beans", "rice and beans"),
+        ("a" * 150, "a" * 150),
+        ("a" * 151, "a" * 150),
+        ("a" * 300, "a" * 150),
+        (None, None),
+    ],
+)
+def test_analyze_normalizes_meal_context(raw, expected):
+    svc = _mock_service()
+    resp = _post_with_context(svc, raw)
+    assert resp.status_code == 200
+    assert svc.analyze.call_args.kwargs["meal_context"] == expected
+
+
+def _analyze_request_record(caplog):
+    return next(r for r in caplog.records if r.getMessage() == "analyze_request")
+
+
+def test_analyze_logs_meal_context_length_only(caplog):
+    with caplog.at_level(logging.DEBUG):
+        _post_with_context(_mock_service(), "200g rice")
+    record = _analyze_request_record(caplog)
+    assert record.meal_context_length == 9
+    assert not any(key.startswith("has_") for key in vars(record))
+    for rec in caplog.records:
+        assert "200g rice" not in rec.getMessage()
+        assert "200g rice" not in str(rec.__dict__)
+
+
+def test_analyze_logs_zero_length_without_context(caplog):
+    with caplog.at_level(logging.DEBUG):
+        _post_with_context(_mock_service())
+    assert _analyze_request_record(caplog).meal_context_length == 0
+
+
+def test_analyze_logs_post_truncation_length_and_hides_long_text(caplog):
+    marker = "SECRETMARKER" + "x" * 288
+    with caplog.at_level(logging.DEBUG):
+        _post_with_context(_mock_service(), marker)
+    assert _analyze_request_record(caplog).meal_context_length == 150
+    for rec in caplog.records:
+        assert "SECRETMARKER" not in str(rec.__dict__)

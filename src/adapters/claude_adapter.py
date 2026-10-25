@@ -1,7 +1,7 @@
 from anthropic import AsyncAnthropic
 from anthropic.types import ToolParam
 
-from src.adapters.prompts import TEXT_PROMPT, VISION_PROMPT
+from src.adapters.prompts import TEXT_PROMPT, build_vision_prompt
 from src.domain.food import IdentifiedFoods
 
 TOOL: ToolParam = {
@@ -47,9 +47,7 @@ class ClaudeAdapter:
     async def analyze_image(
         self, image_b64: str, media_type: str, context: str | None = None
     ) -> IdentifiedFoods:
-        prompt = VISION_PROMPT
-        if context:
-            prompt = f"{VISION_PROMPT}\n\nUser context: {context}"
+        prompt = build_vision_prompt(context)
         content = [
             {
                 "type": "image",

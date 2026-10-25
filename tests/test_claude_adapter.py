@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from src.adapters.claude_adapter import ClaudeAdapter
-from src.adapters.prompts import TEXT_PROMPT, VISION_PROMPT
+from src.adapters.prompts import TEXT_PROMPT, VISION_PROMPT, build_vision_prompt
 from src.domain.food import IdentifiedFoods
 
 APPLE_ITEM = {"name": "Apple", "estimated_grams": 180.0, "confidence": 0.9}
@@ -98,3 +98,25 @@ async def test_tool_choice_is_forced(apple_client: AsyncMock) -> None:
 
     call_kwargs = apple_client.messages.create.call_args.kwargs
     assert call_kwargs["tool_choice"] == {"type": "tool", "name": "record_identified_foods"}
+
+
+@pytest.mark.parametrize("context", [None, "   ", "\u200b", "<>"])
+async def test_analyze_image_without_usable_context_sends_plain_vision_prompt(
+    apple_client: AsyncMock, context: str | None
+) -> None:
+    adapter = ClaudeAdapter(api_key="dummy", model="claude-test", client=apple_client)
+    await adapter.analyze_image("abc123", "image/jpeg", context=context)
+
+    content = apple_client.messages.create.call_args.kwargs["messages"][0]["content"]
+    text_blocks = [b for b in content if b.get("type") == "text"]
+    assert [b["text"] for b in text_blocks] == [VISION_PROMPT]
+
+
+async def test_analyze_image_with_context_appends_clause(apple_client: AsyncMock) -> None:
+    adapter = ClaudeAdapter(api_key="dummy", model="claude-test", client=apple_client)
+    await adapter.analyze_image("abc123", "image/jpeg", context="200g rice")
+
+    content = apple_client.messages.create.call_args.kwargs["messages"][0]["content"]
+    text = next(b["text"] for b in content if b.get("type") == "text")
+    assert text == build_vision_prompt("200g rice")
+    assert "<meal_context>\n200g rice\n</meal_context>" in text
