@@ -43,4 +43,3 @@ def test_300_keeps_first_150():
 def test_truncation_leaving_trailing_space_is_rstripped():
     text = "a" * 149 + " " + "b" * 10
     assert normalize_meal_context(text) == "a" * 149
-
