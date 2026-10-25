@@ -100,7 +100,7 @@ async def test_tool_choice_is_forced(apple_client: AsyncMock) -> None:
     assert call_kwargs["tool_choice"] == {"type": "tool", "name": "record_identified_foods"}
 
 
-@pytest.mark.parametrize("context", [None, "   "])
+@pytest.mark.parametrize("context", [None, "   ", "\u200b", "<>"])
 async def test_analyze_image_without_usable_context_sends_plain_vision_prompt(
     apple_client: AsyncMock, context: str | None
 ) -> None:

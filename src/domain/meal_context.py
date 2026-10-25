@@ -3,7 +3,8 @@ import unicodedata
 
 MEAL_CONTEXT_MAX_LEN = 150
 
-_WHITESPACE_CONTROLS = re.compile(r"[\r\n\t\x0b\x0c]+")
+_WHITESPACE_CONTROLS = re.compile(r"[\r\n\t\x0b\x0c\x85\u2028\u2029]+")
+_DROPPED_CATEGORIES = frozenset({"Cc", "Cf"})
 
 
 def normalize_meal_context(raw: str | None) -> str | None:
@@ -11,8 +12,7 @@ def normalize_meal_context(raw: str | None) -> str | None:
     if raw is None:
         return None
     text = _WHITESPACE_CONTROLS.sub(" ", raw)
-    text = "".join(ch for ch in text if unicodedata.category(ch) != "Cc").strip()
+    text = "".join(ch for ch in text if unicodedata.category(ch) not in _DROPPED_CATEGORIES).strip()
     if not text:
         return None
-    text = text[:MEAL_CONTEXT_MAX_LEN].rstrip()
-    return text or None
+    return text[:MEAL_CONTEXT_MAX_LEN].rstrip()

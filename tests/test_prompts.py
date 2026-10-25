@@ -17,7 +17,7 @@ def test_prompt_preserves_spanish_name_guidance(prompt: str) -> None:
     assert "the food name in Spanish (castellano)" in prompt
 
 
-@pytest.mark.parametrize("context", [None, "", "  "])
+@pytest.mark.parametrize("context", [None, "", "  ", "\u200b", "<>", "< \u200b >"])
 def test_build_vision_prompt_without_context_is_unchanged(context: str | None) -> None:
     assert build_vision_prompt(context) is VISION_PROMPT
 

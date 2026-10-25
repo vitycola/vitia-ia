@@ -16,6 +16,12 @@ from src.domain.meal_context import MEAL_CONTEXT_MAX_LEN, normalize_meal_context
         ("a\r\nb", "a b"),
         ("a\x0bb", "a b"),
         ("a\x0cb", "a b"),
+        ("a\x85b", "a b"),
+        ("a\u2028b", "a b"),
+        ("a\u2029b", "a b"),
+        ("\u200b", None),
+        ("\u200b\u202e \ufeff", None),
+        ("ri\u200bce", "rice"),
     ],
 )
 def test_normalize_cleans_input(raw, expected):
