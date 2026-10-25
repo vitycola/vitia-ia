@@ -238,7 +238,7 @@ def test_analyze_logs_meal_context_length_only(caplog):
         _post_with_context(_mock_service(), "200g rice")
     record = _analyze_request_record(caplog)
     assert record.meal_context_length == 9
-    assert not hasattr(record, "has_meal_context")
+    assert not any(key.startswith("has_") for key in vars(record))
     for rec in caplog.records:
         assert "200g rice" not in rec.getMessage()
         assert "200g rice" not in str(rec.__dict__)
